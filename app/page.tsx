@@ -127,36 +127,43 @@ export default function HomePage() {
             enhance quality to preserve your most treasured memories forever.
           </p>
 
-          {/* Video Demo */}
+          {/* Animated Before/After Demo */}
           <div className="mb-12">
             <div className="relative max-w-3xl mx-auto">
               <div className="relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-deep-navy/5 to-rich-coral/5">
-                <video
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-96 object-cover"
-                  poster="/placeholder.svg?height=400&width=800"
-                >
-                  <source src="/restoration-demo.mp4" type="video/mp4" />
-                  {/* Fallback for browsers that don't support video */}
-                  <div className="h-96 flex items-center justify-center bg-gradient-to-r from-gray-300 to-gray-400">
-                    <div className="text-center">
-                      <Sparkles className="h-16 w-16 text-rich-coral mx-auto mb-4" />
-                      <p className="text-deep-navy font-serif text-xl">AI Photo Restoration Demo</p>
+                {/* Animated container */}
+                <div className="relative h-96 flex items-center justify-center">
+                  <div className="absolute inset-0 animate-pulse">
+                    <div className="grid grid-cols-2 h-full">
+                      <div className="bg-gradient-to-r from-gray-300 to-gray-400 flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="w-16 h-16 bg-gray-500 rounded-full mx-auto mb-4 opacity-50"></div>
+                          <p className="text-gray-600 font-serif text-lg">Damaged Photo</p>
+                        </div>
+                      </div>
+                      <div className="bg-gradient-to-r from-rich-coral/20 to-rich-coral/30 flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="w-16 h-16 bg-rich-coral rounded-full mx-auto mb-4 flex items-center justify-center">
+                            <Sparkles className="h-8 w-8 text-white" />
+                          </div>
+                          <p className="text-deep-navy font-serif text-lg">AI Restored</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </video>
 
-                {/* Video overlay with branding */}
-                <div className="absolute bottom-6 left-6">
-                  <Badge className="bg-white/90 text-deep-navy border-deep-navy/20 font-sans">⚡ Live AI Demo</Badge>
+                  {/* Center divider with arrow */}
+                  <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+                    <div className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center">
+                      <ArrowRight className="h-6 w-6 text-rich-coral animate-pulse" />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Play/Pause button overlay (optional) */}
-                <div className="absolute top-6 right-6">
-                  <Badge className="bg-black/50 text-white border-white/20 font-sans">🎬 Demo Video</Badge>
+                <div className="absolute bottom-6 left-6 text-deep-navy">
+                  <Badge className="bg-white/90 text-deep-navy border-deep-navy/20 font-sans">
+                    ⚡ Instant AI Processing
+                  </Badge>
                 </div>
               </div>
             </div>
