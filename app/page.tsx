@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { VideoDemo } from "@/components/ui/video-demo"
 import {
   Upload,
   Palette,
@@ -128,8 +127,40 @@ export default function HomePage() {
             enhance quality to preserve your most treasured memories forever.
           </p>
 
-          {/* Video Demo Component */}
-          <VideoDemo />
+          {/* Video Demo */}
+          <div className="mb-12">
+            <div className="relative max-w-3xl mx-auto">
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-deep-navy/5 to-rich-coral/5">
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-96 object-cover"
+                  poster="/placeholder.svg?height=400&width=800"
+                >
+                  <source src="/restoration-demo.mp4" type="video/mp4" />
+                  {/* Fallback for browsers that don't support video */}
+                  <div className="h-96 flex items-center justify-center bg-gradient-to-r from-gray-300 to-gray-400">
+                    <div className="text-center">
+                      <Sparkles className="h-16 w-16 text-rich-coral mx-auto mb-4" />
+                      <p className="text-deep-navy font-serif text-xl">AI Photo Restoration Demo</p>
+                    </div>
+                  </div>
+                </video>
+
+                {/* Video overlay with branding */}
+                <div className="absolute bottom-6 left-6">
+                  <Badge className="bg-white/90 text-deep-navy border-deep-navy/20 font-sans">⚡ Live AI Demo</Badge>
+                </div>
+
+                {/* Play/Pause button overlay (optional) */}
+                <div className="absolute top-6 right-6">
+                  <Badge className="bg-black/50 text-white border-white/20 font-sans">🎬 Demo Video</Badge>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
             <Button
