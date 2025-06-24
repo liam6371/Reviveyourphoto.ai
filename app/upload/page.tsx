@@ -24,7 +24,6 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { StripeCheckout } from "@/components/ui/stripe-checkout"
 
 export default function UploadPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -273,8 +272,12 @@ export default function UploadPage() {
     }
 
     setIsEmailSending(true)
+    addDebugInfo("Starting email delivery process...")
 
     try {
+      addDebugInfo(`Sending email to: ${email}`)
+      addDebugInfo(`Restored images count: ${restorationResults.length}`)
+
       const response = await fetch("/api/send-email", {
         method: "POST",
         headers: {
@@ -289,14 +292,17 @@ export default function UploadPage() {
         }),
       })
 
+      addDebugInfo(`Email API response status: ${response.status}`)
+
       const result = await response.json()
+      addDebugInfo(`Email API response: ${JSON.stringify(result, null, 2)}`)
 
       if (result.success) {
         setEmailSent(true)
         setEmailDemo(result.demo || false)
 
         if (result.demo) {
-          alert(`Demo Mode: Email simulation complete! In production, your restored photos would be sent to ${email}.`)
+          alert(`Demo Mode: ${result.message}`)
         } else {
           alert(`Success! Your restored photos have been emailed to ${email}. Check your inbox in a few minutes.`)
         }
@@ -305,9 +311,16 @@ export default function UploadPage() {
       }
     } catch (error) {
       console.error("Email sending error:", error)
-      alert("Failed to send email. Please try downloading the images directly.")
+      addDebugInfo(`Email error: ${error instanceof Error ? error.message : "Unknown error"}`)
+
+      // Show more detailed error message
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+      alert(
+        `Email sending failed: ${errorMessage}. Please try downloading the images directly or check the debug info above.`,
+      )
     } finally {
       setIsEmailSending(false)
+      addDebugInfo("Email delivery process completed")
     }
   }
 
@@ -794,48 +807,7 @@ export default function UploadPage() {
                     <span>Secure Payment</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  {!showPayment ? (
-                    <>
-                      <div className="flex justify-between font-sans">
-                        <span>Photos processed:</span>
-                        <span className="font-semibold">{selectedFiles.length}</span>
-                      </div>
-                      <div className="flex justify-between font-sans">
-                        <span>Services applied:</span>
-                        <span className="font-semibold">{selectedServices.length}</span>
-                      </div>
-                      <div className="flex justify-between font-sans">
-                        <span>Price per photo:</span>
-                        <span className="font-semibold">
-                          $0.04 <Badge className="ml-2 bg-green-100 text-green-700 text-xs">Demo Launch</Badge>
-                        </span>
-                      </div>
-                      <div className="border-t pt-6">
-                        <div className="flex justify-between text-xl">
-                          <span className="font-serif font-semibold">Total:</span>
-                          <span className="font-serif font-bold text-rich-coral">${pricing.total.toFixed(2)}</span>
-                        </div>
-                      </div>
-                      <Button
-                        onClick={handlePayment}
-                        className="w-full bg-rich-coral hover:bg-rich-coral/90 text-white font-sans"
-                        size="lg"
-                      >
-                        Pay Securely - ${pricing.total.toFixed(2)}
-                      </Button>
-                    </>
-                  ) : (
-                    <StripeCheckout
-                      amount={pricing.total}
-                      photoCount={selectedFiles.length}
-                      services={selectedServices}
-                      email={email}
-                      onSuccess={handlePaymentSuccess}
-                      onError={handlePaymentError}
-                    />
-                  )}
-                </CardContent>
+                <CardContent></CardContent>
               </Card>
             </div>
 

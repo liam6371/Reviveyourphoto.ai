@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import { put } from "@vercel/blob"
 
 // Initialize Resend (will work in demo mode if no API key)
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
@@ -10,6 +9,21 @@ const VERIFIED_EMAIL = "athasl18@gmail.com"
 
 async function uploadImageToBlob(imageUrl: string, filename: string): Promise<string> {
   try {
+    console.log(`Attempting to upload image: ${filename}`)
+    console.log(`Image URL: ${imageUrl}`)
+
+    // Check if we have blob storage configured
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.log("Blob storage not configured, using original URL")
+      return imageUrl
+    }
+
+    // Only try to upload external URLs (Replicate results)
+    if (!imageUrl.startsWith("http")) {
+      console.log("Image is data URL, using original")
+      return imageUrl
+    }
+
     // Fetch the image from the URL
     const response = await fetch(imageUrl)
     if (!response.ok) {
@@ -19,29 +33,50 @@ async function uploadImageToBlob(imageUrl: string, filename: string): Promise<st
     const imageBuffer = await response.arrayBuffer()
     const blob = new Uint8Array(imageBuffer)
 
+    // Dynamic import of Vercel Blob
+    const { put } = await import("@vercel/blob")
+
     // Upload to Vercel Blob storage
-    const { url } = await put(`restored/${filename}`, blob, {
+    const { url } = await put(`restored/${Date.now()}_${filename}`, blob, {
       access: "public",
       contentType: response.headers.get("content-type") || "image/jpeg",
     })
 
+    console.log(`Successfully uploaded to blob: ${url}`)
     return url
   } catch (error) {
-    console.error("Failed to upload image to blob storage:", error)
-    return imageUrl // Return original URL as fallback
+    console.error(`Failed to upload image ${filename}:`, error)
+    // Return original URL as fallback
+    return imageUrl
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("=== EMAIL API CALLED ===")
+
     const { email, restoredImages, originalImages, services, filenames } = await request.json()
 
+    console.log("Request data:", {
+      email,
+      restoredImagesCount: restoredImages?.length || 0,
+      originalImagesCount: originalImages?.length || 0,
+      servicesCount: services?.length || 0,
+      filenamesCount: filenames?.length || 0,
+    })
+
     if (!email || !restoredImages || restoredImages.length === 0) {
+      console.error("Missing required fields")
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
     console.log("Processing email request for:", email)
     console.log("Restored images received:", restoredImages.length)
+    console.log("Environment check:", {
+      hasResendKey: !!process.env.RESEND_API_KEY,
+      hasBlobToken: !!process.env.BLOB_READ_WRITE_TOKEN,
+      resendKeyLength: process.env.RESEND_API_KEY?.length || 0,
+    })
 
     // Demo mode if no Resend API key
     if (!resend || !process.env.RESEND_API_KEY) {
@@ -76,25 +111,40 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Store images permanently for real email
-    console.log("Uploading restored images to permanent storage...")
-    const permanentImageUrls = []
+    // Real email sending with Resend (only for verified email)
+    console.log("Sending real email via Resend to verified address:", email)
+
+    // Process images with fallback handling
+    console.log("Processing images for email...")
+    const processedImages = []
 
     for (let i = 0; i < restoredImages.length; i++) {
       const imageUrl = restoredImages[i]
       const filename = filenames?.[i] || `restored_photo_${i + 1}.jpg`
 
-      console.log(`Uploading image ${i + 1}:`, filename)
+      console.log(`Processing image ${i + 1}/${restoredImages.length}: ${filename}`)
 
-      // Upload to Vercel Blob storage
-      const permanentUrl = await uploadImageToBlob(imageUrl, filename)
-      permanentImageUrls.push(permanentUrl)
-
-      console.log(`Image ${i + 1} uploaded:`, permanentUrl)
+      try {
+        // Try to upload to permanent storage, but don't fail if it doesn't work
+        const permanentUrl = await uploadImageToBlob(imageUrl, filename)
+        processedImages.push({
+          url: permanentUrl,
+          filename: filename,
+          index: i + 1,
+        })
+        console.log(`Image ${i + 1} processed successfully`)
+      } catch (error) {
+        console.error(`Failed to process image ${i + 1}:`, error)
+        // Use original URL as fallback
+        processedImages.push({
+          url: imageUrl,
+          filename: filename,
+          index: i + 1,
+        })
+      }
     }
 
-    // Real email sending with Resend (only for verified email)
-    console.log("Sending real email via Resend to verified address:", email)
+    console.log(`All images processed. Total: ${processedImages.length}`)
 
     // Create email content
     const servicesList = services
@@ -152,21 +202,21 @@ export async function POST(request: NextRequest) {
               <div class="services">
                 <h3>Services Applied:</h3>
                 <p><strong>${servicesList}</strong></p>
-                <p>Photos processed: <strong>${permanentImageUrls.length}</strong></p>
+                <p>Photos processed: <strong>${processedImages.length}</strong></p>
               </div>
 
               <h3>Your Restored Photos:</h3>
               <p>Your restored photos are ready for download. Click the buttons below to save each photo:</p>
               
               <div class="photo-preview">
-                ${permanentImageUrls
+                ${processedImages
                   .map(
-                    (url: string, index: number) => `
+                    (image) => `
                     <div style="margin: 20px 0; padding: 20px; background: white; border-radius: 8px;">
-                      <h4>Photo ${index + 1}</h4>
-                      <img src="${url}" alt="Restored Photo ${index + 1}" style="max-width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                      <h4>Photo ${image.index}</h4>
+                      <img src="${image.url}" alt="Restored Photo ${image.index}" style="max-width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
                       <br><br>
-                      <a href="${url}" class="button" download="restored_photo_${index + 1}.jpg">Download Photo ${index + 1}</a>
+                      <a href="${image.url}" class="button" download="${image.filename}">Download Photo ${image.index}</a>
                     </div>
                   `,
                   )
@@ -184,7 +234,7 @@ export async function POST(request: NextRequest) {
               <div class="demo-notice">
                 <h4>Demo Information:</h4>
                 <p>• These are real AI-restored photos processed by Replicate</p>
-                <p>• Images are stored permanently and ready for download</p>
+                <p>• Images are available for download</p>
                 <p>• All photos are processed with the same technology customers will receive</p>
               </div>
 
@@ -203,48 +253,75 @@ export async function POST(request: NextRequest) {
     `
 
     try {
+      console.log("Attempting to send email via Resend...")
+
       // Send email with Resend to verified address
       const { data, error } = await resend.emails.send({
         from: "Revive My Photo <onboarding@resend.dev>", // Use resend.dev domain
         to: [email],
-        subject: `Your ${permanentImageUrls.length} Revived Photo${permanentImageUrls.length > 1 ? "s" : ""} - Revive My Photo`,
+        subject: `Your ${processedImages.length} Revived Photo${processedImages.length > 1 ? "s" : ""} - Revive My Photo`,
         html: emailHtml,
       })
 
       if (error) {
         console.error("Resend error:", error)
-        throw new Error(`Failed to send email: ${error.message}`)
+        throw new Error(`Resend API error: ${JSON.stringify(error)}`)
       }
 
-      console.log("Email sent successfully with permanent image URLs:", data)
+      console.log("Email sent successfully:", data)
 
       return NextResponse.json({
         success: true,
-        message: `Real email sent successfully to ${email}! Check your inbox for ${permanentImageUrls.length} restored photos.`,
+        message: `Real email sent successfully to ${email}! Check your inbox for ${processedImages.length} restored photos.`,
         emailSent: true,
         emailId: data?.id,
         demo: false,
         verified: true,
-        imageUrls: permanentImageUrls,
+        imageUrls: processedImages.map((img) => img.url),
       })
     } catch (emailError) {
       console.error("Email sending failed:", emailError)
 
+      // Provide more specific error information
+      let errorMessage = "Failed to send email"
+      if (emailError instanceof Error) {
+        if (emailError.message.includes("API key")) {
+          errorMessage = "Email service configuration error"
+        } else if (emailError.message.includes("rate limit")) {
+          errorMessage = "Email rate limit exceeded"
+        } else if (emailError.message.includes("domain")) {
+          errorMessage = "Email domain verification required"
+        } else {
+          errorMessage = `Email service error: ${emailError.message}`
+        }
+      }
+
       return NextResponse.json(
         {
-          error: "Failed to send email",
+          error: errorMessage,
           details: emailError instanceof Error ? emailError.message : "Unknown error",
+          success: false,
+          debug: {
+            hasResendKey: !!process.env.RESEND_API_KEY,
+            resendKeyLength: process.env.RESEND_API_KEY?.length || 0,
+            email: email,
+            isVerified: isVerifiedEmail,
+          },
         },
         { status: 500 },
       )
     }
   } catch (error) {
-    console.error("Email sending error:", error)
+    console.error("=== EMAIL API ERROR ===")
+    console.error("Error details:", error)
+    console.error("Stack trace:", error instanceof Error ? error.stack : "No stack trace")
+
     return NextResponse.json(
       {
-        error: "Failed to send email",
+        error: "Failed to process email request",
         details: error instanceof Error ? error.message : "Unknown error",
-        suggestion: "Try the demo mode or use a verified email address",
+        success: false,
+        suggestion: "Check server logs for detailed error information",
       },
       { status: 500 },
     )
