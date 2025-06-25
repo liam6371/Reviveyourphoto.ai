@@ -10,7 +10,19 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { RestorationPreview } from "@/components/ui/restoration-preview"
-import { Upload, X, ArrowLeft, Camera, CheckCircle, Loader2, Mail, Sparkles, AlertTriangle } from "lucide-react"
+import {
+  Upload,
+  X,
+  ArrowLeft,
+  Camera,
+  CheckCircle,
+  Loader2,
+  Mail,
+  Sparkles,
+  AlertTriangle,
+  Download,
+  ExternalLink,
+} from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { StripeCheckout } from "@/components/ui/stripe-checkout"
@@ -29,6 +41,8 @@ export default function UploadPage() {
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<string[]>([])
+  const [downloadLinks, setDownloadLinks] = useState<any[]>([])
+  const [directDownload, setDirectDownload] = useState(false)
 
   // Enhanced debug logging
   const addDebugInfo = (message: string) => {
@@ -283,13 +297,34 @@ export default function UploadPage() {
       addDebugInfo(`Post-payment email result: ${JSON.stringify(result, null, 2)}`)
 
       if (result.success) {
-        setEmailSent(true)
+        setEmailSent(result.emailSent)
 
-        alert(`Payment successful! Your restored photos have been sent to ${email}. Payment ID: ${paymentIntentId}`)
+        // Handle direct download fallback
+        if (result.directDownload && result.downloadLinks) {
+          setDirectDownload(true)
+          setDownloadLinks(result.downloadLinks)
+        }
+
+        if (result.emailSent) {
+          alert(`Payment successful! Your restored photos have been sent to ${email}. Payment ID: ${paymentIntentId}`)
+        } else {
+          alert(
+            `Payment successful! ${result.message || "Your photos are ready for download."} Payment ID: ${paymentIntentId}`,
+          )
+        }
       } else {
-        alert(
-          `Payment successful (ID: ${paymentIntentId}), but email delivery failed. Please contact support with your payment ID to receive your photos.`,
-        )
+        // Even if email fails, if it's a paid order, we should have fallback
+        if (result.paid && result.downloadLinks) {
+          setDirectDownload(true)
+          setDownloadLinks(result.downloadLinks)
+          alert(
+            `Payment successful! ${result.supportMessage || "Email delivery failed but your photos are ready for download."} Payment ID: ${paymentIntentId}`,
+          )
+        } else {
+          alert(
+            `Payment successful (ID: ${paymentIntentId}), but email delivery failed. Please contact support with your payment ID to receive your photos.`,
+          )
+        }
       }
     } catch (error) {
       console.error("Post-payment email error:", error)
@@ -393,6 +428,57 @@ export default function UploadPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Direct Download Section - Show if email failed but payment succeeded */}
+        {directDownload && downloadLinks.length > 0 && (
+          <Card className="mb-8 bg-gradient-to-r from-green-50 to-green-100 border-green-200">
+            <CardHeader>
+              <CardTitle className="font-serif text-green-900 flex items-center">
+                <Download className="h-6 w-6 mr-2" />
+                Your Photos Are Ready!
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-green-800 font-sans">
+                Your payment was successful! Download your restored photos directly below:
+              </p>
+              <div className="grid gap-4">
+                {downloadLinks.map((link, index) => (
+                  <div key={index} className="flex items-center justify-between bg-white p-4 rounded-lg shadow">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <Download className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-serif font-semibold text-deep-navy">Photo {link.index}</h4>
+                        <p className="text-sm text-deep-navy/60 font-sans">{link.filename}</p>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        onClick={() => downloadImage(link.url, link.filename)}
+                        className="bg-green-600 hover:bg-green-700 text-white font-sans"
+                        size="sm"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                      <Button
+                        onClick={() => window.open(link.url, "_blank")}
+                        variant="outline"
+                        className="border-green-600 text-green-600 hover:bg-green-50 font-sans"
+                        size="sm"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        View
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {step === 1 && (
           <div className="space-y-12">
@@ -696,8 +782,6 @@ export default function UploadPage() {
                   error={null}
                   onDownload={() => downloadImage(result.restoredImage, result.filename)}
                   services={result.services}
-                  isDemo={result.isDemo}
-                  demoMessage={result.demoMessage}
                 />
               ))}
             </div>
@@ -751,8 +835,12 @@ export default function UploadPage() {
                   <h3 className="text-2xl font-serif font-bold text-green-900 mb-2">Payment Successful!</h3>
                   <p className="text-green-800 font-sans mb-4">
                     {isEmailSending
-                      ? "Sending your restored photos via email..."
-                      : "Your restored photos have been emailed to you!"}
+                      ? "Processing your order and preparing delivery..."
+                      : emailSent
+                        ? "Your restored photos have been emailed to you!"
+                        : directDownload
+                          ? "Your photos are ready for download above!"
+                          : "Your order is being processed..."}
                   </p>
                   {isEmailSending && <Loader2 className="h-6 w-6 text-green-600 animate-spin mx-auto" />}
                 </CardContent>

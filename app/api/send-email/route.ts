@@ -84,25 +84,12 @@ export async function POST(request: NextRequest) {
     // For paid orders, try harder to send real emails
     const isPaidOrder = !!paid && !!paymentIntentId
 
-    if (!resend || !process.env.RESEND_API_KEY) {
-      console.log("Resend API key missing - this is a problem!")
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Email service not configured. Please contact support with your payment ID.",
-          paymentIntentId,
-        },
-        { status: 500 },
-      )
+    // CRITICAL: For paid orders, we MUST deliver the photos somehow
+    if (isPaidOrder) {
+      console.log("PAID ORDER DETECTED - Ensuring delivery at all costs")
     }
 
-    // Check if this is the verified email address OR if it's a paid order
-    const isVerifiedEmail = email.toLowerCase() === VERIFIED_EMAIL.toLowerCase()
-
-    // Real email sending with Resend (for verified email OR paid orders)
-    console.log("Sending real email via Resend to:", email, isPaidOrder ? "(PAID ORDER)" : "(VERIFIED EMAIL)")
-
-    // Process images with fallback handling
+    // Process images with fallback handling FIRST
     console.log("Processing images for email...")
     const processedImages = []
 
@@ -133,6 +120,53 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`All images processed. Total: ${processedImages.length}`)
+
+    // If no Resend API key, handle paid orders specially
+    if (!resend || !process.env.RESEND_API_KEY) {
+      console.log("No Resend API key configured")
+
+      if (isPaidOrder) {
+        console.log("PAID ORDER but no email service - providing direct download links")
+
+        // For paid orders without email service, return success with download links
+        return NextResponse.json({
+          success: true,
+          message: `Payment confirmed! Your photos are ready for download. Email service is being configured - you can download your ${processedImages.length} restored photos directly.`,
+          emailSent: false,
+          paid: true,
+          paymentIntentId,
+          downloadLinks: processedImages,
+          directDownload: true,
+          notice: "Email delivery is being set up. Your photos are available for immediate download above.",
+        })
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Email service not configured.",
+        },
+        { status: 500 },
+      )
+    }
+
+    // Check if this is the verified email address OR if it's a paid order
+    const isVerifiedEmail = email.toLowerCase() === VERIFIED_EMAIL.toLowerCase()
+
+    // For paid orders, we send to ANY email address
+    if (!isVerifiedEmail && !isPaidOrder) {
+      console.log(`Email ${email} is not verified and not a paid order.`)
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Email address not verified for free service.",
+        },
+        { status: 400 },
+      )
+    }
+
+    // Real email sending with Resend (for verified email OR paid orders)
+    console.log("Sending real email via Resend to:", email, isPaidOrder ? "(PAID ORDER)" : "(VERIFIED EMAIL)")
 
     // Create email content
     const servicesList = services
@@ -189,15 +223,10 @@ export async function POST(request: NextRequest) {
                 <h3>✅ Payment Confirmed</h3>
                 <p><strong>Thank you for your purchase!</strong> Your payment has been processed successfully.</p>
                 <p><strong>Payment ID:</strong> ${paymentIntentId}</p>
-                <p><strong>Amount:</strong> $${(processedImages.length * 0.5).toFixed(2)} (Launch Special Pricing)</p>
+                <p><strong>Amount:</strong> $${(processedImages.length * 0.5).toFixed(2)}</p>
               </div>
               `
-                  : `
-              <div class="paid-notice">
-                <h3>🚀 Launch Special Active</h3>
-                <p><strong>You're getting real AI-restored photos at our launch price!</strong> This is professional photo restoration using advanced AI technology at our special introductory pricing of $0.50 per photo.</p>
-              </div>
-              `
+                  : ""
               }
               
               <div class="services">
@@ -243,14 +272,7 @@ export async function POST(request: NextRequest) {
                 <p>• Keep this email as your receipt</p>
               </div>
               `
-                  : `
-              <div class="paid-notice">
-                <h4>Launch Special Information:</h4>
-                <p>• Real AI-restored photos processed by Replicate</p>
-                <p>• Professional quality at introductory pricing</p>
-                <p>• All photos processed with production-grade technology</p>
-              </div>
-              `
+                  : ""
               }
 
               <p>If you have any questions or need assistance, please don't hesitate to contact our support team${isPaidOrder ? ` and reference your payment ID: ${paymentIntentId}` : ""}.</p>
@@ -282,16 +304,20 @@ export async function POST(request: NextRequest) {
       if (error) {
         console.error("Resend error:", error)
 
-        // For paid orders, this is a critical error
+        // For paid orders, provide fallback with download links instead of failing
         if (isPaidOrder) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: `Failed to send receipt email for paid order. Please contact support with payment ID: ${paymentIntentId}`,
-              paymentIntentId,
-            },
-            { status: 500 },
-          )
+          console.log("Email failed for paid order - providing direct download fallback")
+          return NextResponse.json({
+            success: true,
+            message: `Payment confirmed! Email delivery encountered an issue, but your photos are ready for download. Payment ID: ${paymentIntentId}`,
+            emailSent: false,
+            paid: true,
+            paymentIntentId,
+            downloadLinks: processedImages,
+            directDownload: true,
+            emailError: error,
+            notice: "Email delivery failed, but your photos are available for immediate download above.",
+          })
         }
 
         throw new Error(`Resend API error: ${JSON.stringify(error)}`)
@@ -301,10 +327,9 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `${isPaidOrder ? "Payment confirmed! " : ""}Real email sent successfully to ${email}! Check your inbox for ${processedImages.length} professionally restored photos.`,
+        message: `${isPaidOrder ? "Payment confirmed! " : ""}Email sent successfully to ${email}! Check your inbox for ${processedImages.length} professionally restored photos.`,
         emailSent: true,
         emailId: data?.id,
-        verified: true,
         paid: isPaidOrder,
         paymentIntentId: isPaidOrder ? paymentIntentId : undefined,
         imageUrls: processedImages.map((img) => img.url),
@@ -312,52 +337,29 @@ export async function POST(request: NextRequest) {
     } catch (emailError) {
       console.error("Email sending failed:", emailError)
 
-      // For paid orders, this is critical
+      // For paid orders, ALWAYS provide a fallback - never fail completely
       if (isPaidOrder) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Payment successful but email delivery failed. Please contact support with payment ID: ${paymentIntentId} to receive your photos.`,
-            paymentIntentId,
-          },
-          { status: 500 },
-        )
+        console.log("Email completely failed for paid order - providing emergency fallback")
+        return NextResponse.json({
+          success: true, // Still success because payment went through
+          message: `Payment confirmed! Email delivery failed, but your photos are ready for download. Payment ID: ${paymentIntentId}`,
+          emailSent: false,
+          paid: true,
+          paymentIntentId,
+          downloadLinks: processedImages,
+          directDownload: true,
+          emailError: emailError instanceof Error ? emailError.message : "Unknown email error",
+          notice: "Email service temporarily unavailable. Your photos are available for immediate download above.",
+          supportMessage: `If you need assistance, contact support with Payment ID: ${paymentIntentId}`,
+        })
       }
 
-      // Provide more specific error information and better fallbacks
-      let errorMessage = "Failed to send email"
-      const shouldFallbackToDemo = false
-
-      if (emailError instanceof Error) {
-        if (emailError.message.includes("API key") || emailError.message.includes("Authentication")) {
-          errorMessage = "Email service configuration error"
-        } else if (emailError.message.includes("rate limit")) {
-          errorMessage = "Email rate limit exceeded - please try again in a few minutes"
-        } else if (emailError.message.includes("domain") || emailError.message.includes("Domain")) {
-          errorMessage = "Email domain verification in progress"
-        } else {
-          errorMessage = `Email service error: ${emailError.message}`
-        }
-      }
-
+      // For non-paid orders, we can fail normally
       return NextResponse.json(
         {
-          error: errorMessage,
+          error: "Failed to send email",
           details: emailError instanceof Error ? emailError.message : "Unknown error",
           success: false,
-          fallback: {
-            message: "Your photos are ready for download from the preview page above",
-            downloadAvailable: true,
-            imageUrls: processedImages.map((img) => img.url),
-          },
-          debug: {
-            hasResendKey: !!process.env.RESEND_API_KEY,
-            resendKeyLength: process.env.RESEND_API_KEY?.length || 0,
-            email: email,
-            isVerified: isVerifiedEmail,
-            isPaid: isPaidOrder,
-            suggestion: "Add your domain to Resend and verify it, or use the direct download option",
-          },
         },
         { status: 500 },
       )
@@ -365,14 +367,35 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("=== EMAIL API ERROR ===")
     console.error("Error details:", error)
-    console.error("Stack trace:", error instanceof Error ? error.stack : "No stack trace")
+
+    // Extract payment info from request if available
+    let paymentIntentId = null
+    let isPaidOrder = false
+    try {
+      const body = await request.json()
+      paymentIntentId = body.paymentIntentId
+      isPaidOrder = !!body.paid && !!paymentIntentId
+    } catch (e) {
+      // Ignore parsing errors
+    }
+
+    // For paid orders, even if everything fails, provide some fallback
+    if (isPaidOrder && paymentIntentId) {
+      return NextResponse.json({
+        success: false,
+        error: "Email processing failed completely",
+        paid: true,
+        paymentIntentId,
+        supportMessage: `Your payment was successful (ID: ${paymentIntentId}). Please contact support to receive your photos.`,
+        details: error instanceof Error ? error.message : "Unknown error",
+      })
+    }
 
     return NextResponse.json(
       {
         error: "Failed to process email request",
         details: error instanceof Error ? error.message : "Unknown error",
         success: false,
-        suggestion: "Check server logs for detailed error information",
       },
       { status: 500 },
     )

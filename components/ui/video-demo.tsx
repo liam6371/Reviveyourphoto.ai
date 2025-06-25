@@ -19,7 +19,7 @@ export function VideoDemo() {
         <div className="relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-deep-navy/5 to-rich-coral/5">
           {!videoError ? (
             <>
-              {/* Video Option */}
+              {/* Video Option - Updated to use your MP4 */}
               <video
                 autoPlay
                 loop
@@ -30,6 +30,7 @@ export function VideoDemo() {
                 onError={handleVideoError}
               >
                 <source src="/restoration-demo.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
               </video>
 
               {/* Video overlay with branding */}
@@ -44,51 +45,35 @@ export function VideoDemo() {
               <div className="absolute top-6 right-6">
                 <Badge className="bg-black/50 text-white border-white/20 font-sans">
                   <Play className="h-4 w-4 mr-2" />
-                  Watch Now
+                  Live Demo
                 </Badge>
               </div>
             </>
           ) : (
-            /* Fallback: Animated Demo with Before/After Images */
-            <div className="w-full h-96 bg-gradient-to-r from-gray-100 to-gray-200 flex items-center justify-center relative overflow-hidden">
-              {/* Animated Before/After Showcase */}
-              <div className="grid grid-cols-2 gap-8 w-full h-full p-8">
-                <div className="text-center">
-                  <h3 className="text-deep-navy font-serif text-xl mb-4">Before</h3>
-                  <div className="relative h-48 bg-white rounded-lg overflow-hidden shadow-lg">
-                    <Image
-                      src="/examples/damaged-military-portrait.jpg"
-                      alt="Damaged photo before restoration"
-                      fill
-                      className="object-cover opacity-70"
-                    />
-                  </div>
-                </div>
-                <div className="text-center">
-                  <h3 className="text-rich-coral font-serif text-xl mb-4">After AI Restoration</h3>
-                  <div className="relative h-48 bg-white rounded-lg overflow-hidden shadow-lg">
-                    <Image
-                      src="/examples/repair-damage-eyes.jpg"
-                      alt="Restored photo after AI processing"
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                </div>
-              </div>
+            /* Fallback: Show as GIF instead */
+            <div className="w-full h-96 relative overflow-hidden">
+              <Image
+                src="/restoration-demo.gif"
+                alt="Photo restoration demo showing before and after transformation"
+                fill
+                className="object-cover"
+                priority
+                unoptimized // Important for GIFs to animate properly
+              />
 
-              {/* Animated Arrow */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-rich-coral text-white p-3 rounded-full shadow-lg animate-pulse">
-                  <ArrowRight className="h-6 w-6" />
-                </div>
-              </div>
-
-              {/* Fallback overlay */}
+              {/* GIF overlay */}
               <div className="absolute bottom-6 left-6">
                 <Badge className="bg-white/90 text-deep-navy border-deep-navy/20 font-sans">
                   <Sparkles className="h-4 w-4 mr-2" />
-                  AI Powered
+                  AI Demo
+                </Badge>
+              </div>
+
+              {/* GIF indicator */}
+              <div className="absolute top-6 right-6">
+                <Badge className="bg-black/50 text-white border-white/20 font-sans">
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Animated Demo
                 </Badge>
               </div>
             </div>
