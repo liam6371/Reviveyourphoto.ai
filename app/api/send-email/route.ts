@@ -153,7 +153,20 @@ export async function POST(request: NextRequest) {
     // Check if this is the verified email address OR if it's a paid order
     const isVerifiedEmail = email.toLowerCase() === VERIFIED_EMAIL.toLowerCase()
 
-    // For paid orders, we send to ANY email address
+    // REMOVE THIS RESTRICTION - Allow any email for paid orders
+    // Comment out or remove these lines:
+    // if (!isVerifiedEmail && !isPaidOrder) {
+    //   console.log(`Email ${email} is not verified and not a paid order.`)
+    //   return NextResponse.json(
+    //     {
+    //       success: false,
+    //       error: "Email address not verified for free service.",
+    //     },
+    //     { status: 400 },
+    //   )
+    // }
+
+    // Replace with: For paid orders, always attempt to send email regardless of verification
     if (!isVerifiedEmail && !isPaidOrder) {
       console.log(`Email ${email} is not verified and not a paid order.`)
       return NextResponse.json(
@@ -295,7 +308,7 @@ export async function POST(request: NextRequest) {
 
       // Send email with Resend
       const { data, error } = await resend.emails.send({
-        from: "Revive My Photo <onboarding@resend.dev>", // Use resend.dev domain
+        from: "Revive My Photo <noreply@yourdomain.com>", // Update this to your domain
         to: [email],
         subject: `${isPaidOrder ? "Receipt: " : ""}Your ${processedImages.length} Revived Photo${processedImages.length > 1 ? "s" : ""} - Revive My Photo`,
         html: emailHtml,
