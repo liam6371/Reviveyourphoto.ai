@@ -39,7 +39,6 @@ export default function UploadPage() {
   const [isEmailSending, setIsEmailSending] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const [emailDemo, setEmailDemo] = useState(false)
-  const [showVolumeDiscount, setShowVolumeDiscount] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<string[]>([])
@@ -274,117 +273,6 @@ export default function UploadPage() {
 
   const pricing = calculatePricing()
 
-  const handleFreeDelivery = async () => {
-    if (!email) {
-      alert("Please enter your email address")
-      return
-    }
-
-    setIsEmailSending(true)
-    addDebugInfo("Starting email delivery process...")
-
-    try {
-      addDebugInfo(`Sending email to: ${email}`)
-      addDebugInfo(`Restored images count: ${restorationResults.length}`)
-
-      const response = await fetch("/api/send-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: email,
-          restoredImages: restorationResults.map((r) => r.restoredImage),
-          originalImages: restorationResults.map((r) => r.originalImage),
-          services: selectedServices,
-          filenames: restorationResults.map((r) => r.filename),
-        }),
-      })
-
-      addDebugInfo(`Email API response status: ${response.status}`)
-
-      const result = await response.json()
-      addDebugInfo(`Email API response: ${JSON.stringify(result, null, 2)}`)
-
-      if (result.success) {
-        setEmailSent(true)
-        setEmailDemo(result.demo || false)
-
-        if (result.demo) {
-          alert(`Demo Mode: ${result.message}`)
-        } else {
-          alert(`Success! Your restored photos have been emailed to ${email}. Check your inbox in a few minutes.`)
-        }
-      } else {
-        throw new Error(result.error || "Failed to send email")
-      }
-    } catch (error) {
-      console.error("Email sending error:", error)
-      addDebugInfo(`Email error: ${error instanceof Error ? error.message : "Unknown error"}`)
-
-      // Parse the response to get better error info
-      let errorMessage = "Failed to send email"
-      let fallbackAvailable = false
-
-      if (error instanceof Error) {
-        errorMessage = error.message
-      }
-
-      // Try to get more info from the API response
-      try {
-        const errorResponse = await fetch("/api/send-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: email,
-            restoredImages: restorationResults.map((r) => r.restoredImage),
-            originalImages: restorationResults.map((r) => r.originalImage),
-            services: selectedServices,
-            filenames: restorationResults.map((r) => r.filename),
-          }),
-        })
-
-        if (!errorResponse.ok) {
-          const errorData = await errorResponse.json()
-          if (errorData.fallback?.downloadAvailable) {
-            fallbackAvailable = true
-            alert(`Email delivery temporarily unavailable, but your photos are ready! ${errorData.fallback.message}`)
-            return
-          }
-        }
-      } catch (retryError) {
-        console.log("Retry also failed, showing original error")
-      }
-
-      // Show user-friendly error message with guidance
-      if (errorMessage.includes("domain")) {
-        alert(
-          `Email setup in progress: The email service domain is being verified. Your restored photos are available for download above in the preview section. You can download each photo individually while we complete the email setup.`,
-        )
-      } else {
-        alert(`Email sending failed: ${errorMessage}. 
-
-Don't worry - your photos are ready! You can:
-1. Download each photo directly from the preview above
-2. Try the email delivery again in a few minutes
-3. Contact support if the issue persists`)
-      }
-    } finally {
-      setIsEmailSending(false)
-      addDebugInfo("Email delivery process completed")
-    }
-  }
-
-  const handlePayment = async () => {
-    if (!email) {
-      alert("Please enter your email address")
-      return
-    }
-
-    // Redirect to real Stripe payment
-    setStep(5) // Add a new payment step
-  }
-
   const handlePaymentSuccess = async (paymentIntentId: string) => {
     setPaymentSuccess(true)
     addDebugInfo(`Payment successful: ${paymentIntentId}`)
@@ -392,6 +280,7 @@ Don't worry - your photos are ready! You can:
     // After successful payment, automatically send the photos via email
     try {
       setIsEmailSending(true)
+      addDebugInfo("Starting post-payment email delivery...")
 
       const response = await fetch("/api/send-email", {
         method: "POST",
@@ -405,24 +294,33 @@ Don't worry - your photos are ready! You can:
           services: selectedServices,
           filenames: restorationResults.map((r) => r.filename),
           paymentIntentId: paymentIntentId,
-          paid: true,
+          paid: true, // This indicates it's a paid order
         }),
       })
 
       const result = await response.json()
+      addDebugInfo(`Post-payment email result: ${JSON.stringify(result, null, 2)}`)
 
       if (result.success) {
         setEmailSent(true)
-        alert(`Payment successful! Your restored photos have been sent to ${email}. Payment ID: ${paymentIntentId}`)
+        setEmailDemo(result.demo || false)
+
+        if (result.demo) {
+          alert(
+            `Payment successful! Demo mode: Your photos would be emailed to ${email} in production. Payment ID: ${paymentIntentId}`,
+          )
+        } else {
+          alert(`Payment successful! Your restored photos have been sent to ${email}. Payment ID: ${paymentIntentId}`)
+        }
       } else {
         alert(
-          `Payment successful (ID: ${paymentIntentId}), but email delivery failed. Please contact support with your payment ID.`,
+          `Payment successful (ID: ${paymentIntentId}), but email delivery failed. Please contact support with your payment ID to receive your photos.`,
         )
       }
     } catch (error) {
       console.error("Post-payment email error:", error)
       alert(
-        `Payment successful (ID: ${paymentIntentId}), but email delivery failed. Please contact support with your payment ID.`,
+        `Payment successful (ID: ${paymentIntentId}), but email delivery failed. Please contact support with your payment ID to receive your photos.`,
       )
     } finally {
       setIsEmailSending(false)
@@ -499,13 +397,7 @@ Don't worry - your photos are ready! You can:
               variant={step >= 4 ? "default" : "secondary"}
               className={step >= 4 ? "bg-rich-coral text-white" : "bg-deep-navy/20 text-deep-navy"}
             >
-              4. Delivery
-            </Badge>
-            <Badge
-              variant={step >= 5 ? "default" : "secondary"}
-              className={step >= 5 ? "bg-rich-coral text-white" : "bg-deep-navy/20 text-deep-navy"}
-            >
-              5. Payment
+              4. Payment
             </Badge>
           </div>
         </div>
@@ -520,8 +412,8 @@ Don't worry - your photos are ready! You can:
               <div>
                 <h3 className="font-serif font-semibold text-blue-900 mb-2">Email Delivery Ready!</h3>
                 <p className="text-blue-800 font-sans text-sm leading-relaxed">
-                  Get your restored photos delivered via email. Add RESEND_API_KEY environment variable to enable real
-                  email delivery, or test with our demo mode.
+                  Your restored photos will be automatically emailed to you after payment. Real email delivery requires
+                  RESEND_API_KEY environment variable.
                 </p>
               </div>
             </div>
@@ -849,7 +741,7 @@ Don't worry - your photos are ready! You can:
                 className="bg-rich-coral hover:bg-rich-coral/90 text-white px-10 py-4 rounded-full font-sans"
                 onClick={() => setStep(4)}
               >
-                Continue to Delivery
+                Continue to Payment
               </Button>
             </div>
           </div>
@@ -860,16 +752,17 @@ Don't worry - your photos are ready! You can:
             <div className="text-center">
               <h1 className="text-5xl font-serif font-bold text-deep-navy mb-6">Complete Your Order</h1>
               <p className="text-xl text-deep-navy/70 font-sans">
-                Enter your email and payment details to receive your restored photos
+                Enter your email and complete payment. Your restored photos will be automatically emailed to you after
+                successful payment.
               </p>
             </div>
 
-            {/* Single Combined Card */}
+            {/* Single Payment Card */}
             <Card className="bg-white/90 backdrop-blur-sm shadow-lg max-w-2xl mx-auto">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-3 font-serif text-deep-navy text-center justify-center">
-                  <Mail className="h-6 w-6 text-rich-coral" />
-                  <span>Order Summary & Payment</span>
+                  <CreditCard className="h-6 w-6 text-rich-coral" />
+                  <span>Secure Payment & Email Delivery</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-8">
@@ -899,7 +792,7 @@ Don't worry - your photos are ready! You can:
                     Email Address
                   </Label>
                   <p className="text-deep-navy/60 font-sans text-sm mb-3">
-                    Your restored photos will be delivered to this email address
+                    Your restored photos will be automatically emailed to this address after payment
                   </p>
                   <Input
                     id="email-payment"
@@ -912,130 +805,73 @@ Don't worry - your photos are ready! You can:
                   />
                 </div>
 
-                {/* Payment Options */}
-                <div className="space-y-6">
-                  <h3 className="font-serif font-semibold text-deep-navy text-lg">Choose Payment Method</h3>
-
-                  {/* Free Demo Option */}
-                  <Card className="border-2 border-green-200 bg-green-50">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-serif font-semibold text-green-900 mb-2">Email Delivery</h4>
-                          <p className="text-green-800 font-sans text-sm">
-                            Get your photos delivered via email (launch special pricing)
-                          </p>
-                        </div>
-                        <Button
-                          onClick={handleFreeDelivery}
-                          disabled={isEmailSending || emailSent || !email}
-                          className="bg-green-600 hover:bg-green-700 text-white font-sans"
-                          size="lg"
-                        >
-                          {isEmailSending ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Sending...
-                            </>
-                          ) : emailSent ? (
-                            <>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Sent!
-                            </>
-                          ) : (
-                            <>
-                              <Mail className="h-4 w-4 mr-2" />
-                              Send Free
-                            </>
-                          )}
-                        </Button>
+                {/* Payment Flow */}
+                <div className="bg-blue-50 rounded-lg p-6">
+                  <h4 className="font-serif font-semibold text-blue-900 mb-3">What happens next:</h4>
+                  <div className="space-y-2 text-blue-800 font-sans text-sm">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                        1
                       </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Divider */}
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-deep-navy/20"></div>
+                      <span>Enter your payment details securely with Stripe</span>
                     </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-4 bg-white text-deep-navy/60 font-sans">or pay securely</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                        2
+                      </div>
+                      <span>Payment is processed instantly</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                        3
+                      </div>
+                      <span>Your restored photos are automatically emailed to you</span>
                     </div>
                   </div>
+                </div>
 
-                  {/* Stripe Payment Option */}
-                  <Card className="border-2 border-rich-coral/20">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <h4 className="font-serif font-semibold text-deep-navy mb-2 flex items-center">
-                            <CreditCard className="h-5 w-5 mr-2" />
-                            Secure Payment
-                          </h4>
-                          <p className="text-deep-navy/70 font-sans text-sm">
-                            Pay ${pricing.total.toFixed(2)} securely with Stripe
-                          </p>
-                        </div>
-                        <Button
-                          onClick={handlePayment}
-                          disabled={!email}
-                          className="bg-rich-coral hover:bg-rich-coral/90 text-white font-sans"
-                          size="lg"
-                        >
-                          <CreditCard className="h-4 w-4 mr-2" />
-                          Pay ${pricing.total.toFixed(2)}
-                        </Button>
-                      </div>
-
-                      {!email && (
-                        <p className="text-orange-600 font-sans text-sm">Please enter your email address first</p>
-                      )}
+                {/* Stripe Payment Component */}
+                {email ? (
+                  <StripeCheckout
+                    amount={pricing.total}
+                    photoCount={pricing.photoCount}
+                    services={selectedServices}
+                    email={email}
+                    onSuccess={handlePaymentSuccess}
+                    onError={handlePaymentError}
+                  />
+                ) : (
+                  <Card className="border-2 border-orange-200 bg-orange-50">
+                    <CardContent className="p-6 text-center">
+                      <AlertTriangle className="h-8 w-8 text-orange-600 mx-auto mb-3" />
+                      <p className="text-orange-800 font-sans">
+                        Please enter your email address above to continue with payment
+                      </p>
                     </CardContent>
                   </Card>
-                </div>
+                )}
 
                 {/* Security Notice */}
                 <div className="text-center bg-gray-50 rounded-lg p-4">
                   <p className="text-xs text-deep-navy/60 font-sans">
-                    🔒 Your payment is secured by Stripe • Your photos are processed with enterprise-grade security
+                    🔒 Your payment is secured by Stripe • Photos are automatically emailed after successful payment
                   </p>
                 </div>
               </CardContent>
             </Card>
 
             {/* Success Messages */}
-            {emailSent && (
-              <Card
-                className={`max-w-2xl mx-auto ${emailDemo ? "bg-blue-50 border-blue-200" : "bg-green-50 border-green-200"}`}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle
-                      className={`h-6 w-6 ${emailDemo ? "text-blue-600" : "text-green-600"} mt-0.5 flex-shrink-0`}
-                    />
-                    <div>
-                      <h4 className={`font-serif font-semibold ${emailDemo ? "text-blue-900" : "text-green-900"} mb-2`}>
-                        {emailDemo ? "Demo Email Sent!" : "Photos Delivered!"}
-                      </h4>
-                      <p className={`${emailDemo ? "text-blue-800" : "text-green-800"} font-sans text-sm`}>
-                        {emailDemo
-                          ? `Demo mode: Your restored photos would be sent to ${email} in production.`
-                          : `Your restored photos have been sent to ${email}. Check your inbox!`}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {paymentSuccess && (
               <Card className="max-w-2xl mx-auto bg-green-50 border-green-200">
                 <CardContent className="p-6 text-center">
                   <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
                   <h3 className="text-2xl font-serif font-bold text-green-900 mb-2">Payment Successful!</h3>
-                  <p className="text-green-800 font-sans">
-                    Your photos are being processed and will be emailed to you shortly.
+                  <p className="text-green-800 font-sans mb-4">
+                    {isEmailSending
+                      ? "Sending your restored photos via email..."
+                      : "Your restored photos have been emailed to you!"}
                   </p>
+                  {isEmailSending && <Loader2 className="h-6 w-6 text-green-600 animate-spin mx-auto" />}
                 </CardContent>
               </Card>
             )}
@@ -1047,35 +883,6 @@ Don't worry - your photos are ready! You can:
                 onClick={() => setStep(3)}
               >
                 Back to Preview
-              </Button>
-            </div>
-          </div>
-        )}
-        {step === 5 && (
-          <div className="space-y-12">
-            <div className="text-center">
-              <h1 className="text-5xl font-serif font-bold text-deep-navy mb-6">Secure Payment</h1>
-              <p className="text-xl text-deep-navy/70 font-sans">
-                Complete your payment to receive your restored photos
-              </p>
-            </div>
-
-            <StripeCheckout
-              amount={pricing.total}
-              photoCount={pricing.photoCount}
-              services={selectedServices}
-              email={email}
-              onSuccess={handlePaymentSuccess}
-              onError={handlePaymentError}
-            />
-
-            <div className="flex justify-center">
-              <Button
-                variant="outline"
-                className="border-deep-navy/30 text-deep-navy hover:bg-deep-navy/5 font-sans"
-                onClick={() => setStep(4)}
-              >
-                Back to Delivery Options
               </Button>
             </div>
           </div>

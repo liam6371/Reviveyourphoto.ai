@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   try {
     console.log("=== EMAIL API CALLED ===")
 
-    const { email, restoredImages, originalImages, services, filenames } = await request.json()
+    const { email, restoredImages, originalImages, services, filenames, paymentIntentId, paid } = await request.json()
 
     console.log("Request data:", {
       email,
@@ -63,6 +63,8 @@ export async function POST(request: NextRequest) {
       originalImagesCount: originalImages?.length || 0,
       servicesCount: services?.length || 0,
       filenamesCount: filenames?.length || 0,
+      paymentIntentId,
+      paid: !!paid,
     })
 
     if (!email || !restoredImages || restoredImages.length === 0) {
@@ -72,14 +74,30 @@ export async function POST(request: NextRequest) {
 
     console.log("Processing email request for:", email)
     console.log("Restored images received:", restoredImages.length)
+    console.log("Is paid order:", !!paid)
     console.log("Environment check:", {
       hasResendKey: !!process.env.RESEND_API_KEY,
       hasBlobToken: !!process.env.BLOB_READ_WRITE_TOKEN,
       resendKeyLength: process.env.RESEND_API_KEY?.length || 0,
     })
 
-    // Demo mode if no Resend API key
+    // For paid orders, try harder to send real emails
+    const isPaidOrder = !!paid && !!paymentIntentId
+
+    // Demo mode if no Resend API key AND not a paid order
     if (!resend || !process.env.RESEND_API_KEY) {
+      if (isPaidOrder) {
+        console.log("PAID ORDER but no Resend API key - this is a problem!")
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Email service not configured for paid orders. Please contact support with your payment ID.",
+            paymentIntentId,
+          },
+          { status: 500 },
+        )
+      }
+
       console.log("Demo mode: Simulating email send to:", email)
 
       // Simulate email processing delay
@@ -93,26 +111,26 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Check if this is the verified email address
+    // Check if this is the verified email address OR if it's a paid order
     const isVerifiedEmail = email.toLowerCase() === VERIFIED_EMAIL.toLowerCase()
 
-    if (!isVerifiedEmail) {
-      console.log(`Email ${email} is not the verified address. Using demo mode.`)
+    if (!isVerifiedEmail && !isPaidOrder) {
+      console.log(`Email ${email} is not verified and not a paid order. Using demo mode.`)
 
       // Simulate email processing delay
       await new Promise((resolve) => setTimeout(resolve, 2000))
 
       return NextResponse.json({
         success: true,
-        message: `Demo Mode: Email simulation sent to ${email} with ${restoredImages.length} restored photo(s). Real emails are currently limited to verified addresses. Your photos are ready for download!`,
+        message: `Demo Mode: Email simulation sent to ${email} with ${restoredImages.length} restored photo(s). Real emails are currently limited to verified addresses during testing. Your photos are ready for download!`,
         emailSent: true,
         demo: true,
         reason: "unverified_recipient",
       })
     }
 
-    // Real email sending with Resend (only for verified email)
-    console.log("Sending real email via Resend to verified address:", email)
+    // Real email sending with Resend (for verified email OR paid orders)
+    console.log("Sending real email via Resend to:", email, isPaidOrder ? "(PAID ORDER)" : "(VERIFIED EMAIL)")
 
     // Process images with fallback handling
     console.log("Processing images for email...")
@@ -179,7 +197,7 @@ export async function POST(request: NextRequest) {
             .footer { text-align: center; margin-top: 30px; color: #8B8B8B; font-size: 14px; }
             .button { display: inline-block; background: #FF6F61; color: white; padding: 12px 24px; text-decoration: none; border-radius: 25px; margin: 10px 5px; font-weight: bold; }
             .button:hover { background: #e55a4f; }
-            .demo-notice { background: #e3f2fd; border: 1px solid #2196f3; border-radius: 8px; padding: 20px; margin: 20px 0; }
+            .paid-notice { background: #e8f5e8; border: 1px solid #4caf50; border-radius: 8px; padding: 20px; margin: 20px 0; }
             .photo-preview { text-align: center; margin: 20px 0; }
             .photo-preview img { max-width: 200px; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 10px; }
           </style>
@@ -194,10 +212,23 @@ export async function POST(request: NextRequest) {
               <h2>Hello!</h2>
               <p>Your precious photos have been carefully restored using our advanced AI technology. We're excited to share the results with you!</p>
               
-              <div class="demo-notice">
+              ${
+                isPaidOrder
+                  ? `
+              <div class="paid-notice">
+                <h3>✅ Payment Confirmed</h3>
+                <p><strong>Thank you for your purchase!</strong> Your payment has been processed successfully.</p>
+                <p><strong>Payment ID:</strong> ${paymentIntentId}</p>
+                <p><strong>Amount:</strong> $${(processedImages.length * 0.5).toFixed(2)} (Launch Special Pricing)</p>
+              </div>
+              `
+                  : `
+              <div class="paid-notice">
                 <h3>🚀 Launch Special Active</h3>
                 <p><strong>You're getting real AI-restored photos at our launch price!</strong> This is professional photo restoration using advanced AI technology at our special introductory pricing of $0.50 per photo.</p>
               </div>
+              `
+              }
               
               <div class="services">
                 <h3>Services Applied:</h3>
@@ -231,14 +262,28 @@ export async function POST(request: NextRequest) {
                 <li>Leave us a review if you're happy with the results!</li>
               </ul>
 
-              <div class="demo-notice">
+              ${
+                isPaidOrder
+                  ? `
+              <div class="paid-notice">
+                <h4>Receipt Information:</h4>
+                <p>• Payment ID: ${paymentIntentId}</p>
+                <p>• Professional AI restoration completed</p>
+                <p>• All photos processed with production-grade technology</p>
+                <p>• Keep this email as your receipt</p>
+              </div>
+              `
+                  : `
+              <div class="paid-notice">
                 <h4>Launch Special Information:</h4>
                 <p>• Real AI-restored photos processed by Replicate</p>
                 <p>• Professional quality at introductory pricing</p>
                 <p>• All photos processed with production-grade technology</p>
               </div>
+              `
+              }
 
-              <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+              <p>If you have any questions or need assistance, please don't hesitate to contact our support team${isPaidOrder ? ` and reference your payment ID: ${paymentIntentId}` : ""}.</p>
               
               <p>Thank you for choosing Revive My Photo!</p>
               <p><strong>The Revive My Photo Team</strong></p>
@@ -246,6 +291,7 @@ export async function POST(request: NextRequest) {
             <div class="footer">
               <p>© 2024 Revive My Photo. All rights reserved.</p>
               <p>This email was sent to ${email}</p>
+              ${isPaidOrder ? `<p>Payment ID: ${paymentIntentId}</p>` : ""}
             </div>
           </div>
         </body>
@@ -255,16 +301,29 @@ export async function POST(request: NextRequest) {
     try {
       console.log("Attempting to send email via Resend...")
 
-      // Send email with Resend to verified address
+      // Send email with Resend
       const { data, error } = await resend.emails.send({
         from: "Revive My Photo <onboarding@resend.dev>", // Use resend.dev domain
         to: [email],
-        subject: `Your ${processedImages.length} Revived Photo${processedImages.length > 1 ? "s" : ""} - Revive My Photo`,
+        subject: `${isPaidOrder ? "Receipt: " : ""}Your ${processedImages.length} Revived Photo${processedImages.length > 1 ? "s" : ""} - Revive My Photo`,
         html: emailHtml,
       })
 
       if (error) {
         console.error("Resend error:", error)
+
+        // For paid orders, this is a critical error
+        if (isPaidOrder) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Failed to send receipt email for paid order. Please contact support with payment ID: ${paymentIntentId}`,
+              paymentIntentId,
+            },
+            { status: 500 },
+          )
+        }
+
         throw new Error(`Resend API error: ${JSON.stringify(error)}`)
       }
 
@@ -272,15 +331,29 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `Real email sent successfully to ${email}! Check your inbox for ${processedImages.length} professionally restored photos.`,
+        message: `${isPaidOrder ? "Payment confirmed! " : ""}Real email sent successfully to ${email}! Check your inbox for ${processedImages.length} professionally restored photos.`,
         emailSent: true,
         emailId: data?.id,
         demo: false,
         verified: true,
+        paid: isPaidOrder,
+        paymentIntentId: isPaidOrder ? paymentIntentId : undefined,
         imageUrls: processedImages.map((img) => img.url),
       })
     } catch (emailError) {
       console.error("Email sending failed:", emailError)
+
+      // For paid orders, this is critical
+      if (isPaidOrder) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Payment successful but email delivery failed. Please contact support with payment ID: ${paymentIntentId} to receive your photos.`,
+            paymentIntentId,
+          },
+          { status: 500 },
+        )
+      }
 
       // Provide more specific error information and better fallbacks
       let errorMessage = "Failed to send email"
@@ -338,6 +411,7 @@ export async function POST(request: NextRequest) {
             resendKeyLength: process.env.RESEND_API_KEY?.length || 0,
             email: email,
             isVerified: isVerifiedEmail,
+            isPaid: isPaidOrder,
             suggestion: "Add your domain to Resend and verify it, or use the direct download option",
           },
         },
