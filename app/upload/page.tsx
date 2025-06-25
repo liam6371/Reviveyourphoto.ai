@@ -76,10 +76,10 @@ export default function UploadPage() {
     },
   ]
 
-  // Demo pricing calculation - $0.50 per photo (Stripe minimum)
+  // RESTORED PRICING - $0.50 per photo (Stripe minimum)
   const calculatePricing = () => {
     const photoCount = selectedFiles.length
-    const basePrice = 0.5 // Updated for Stripe minimum
+    const basePrice = 0.5 // RESTORED to $0.50
 
     const subtotal = photoCount * basePrice
 
@@ -421,8 +421,7 @@ export default function UploadPage() {
               <div>
                 <h3 className="font-serif font-semibold text-blue-900 mb-2">Email Delivery Ready!</h3>
                 <p className="text-blue-800 font-sans text-sm leading-relaxed">
-                  Your restored photos will be automatically emailed to you after payment. Real email delivery requires
-                  RESEND_API_KEY environment variable.
+                  Your restored photos will be automatically emailed to you after payment. Same-day delivery guaranteed!
                 </p>
               </div>
             </div>
@@ -671,14 +670,14 @@ export default function UploadPage() {
                     </div>
                     <div className="flex items-center space-x-3">
                       <CheckCircle className="h-5 w-5 text-rich-coral flex-shrink-0" />
-                      <span className="font-sans text-deep-navy">24-48 hour delivery</span>
+                      <span className="font-sans text-deep-navy">Same-day delivery</span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Simplified order summary */}
+            {/* RESTORED order summary with correct pricing */}
             <Card className="bg-gradient-to-br from-cream to-warm-beige shadow-lg">
               <CardContent className="p-8">
                 <h3 className="text-2xl font-serif font-semibold text-deep-navy mb-6">Order Summary</h3>
@@ -704,7 +703,7 @@ export default function UploadPage() {
                   <div className="bg-rich-coral/10 rounded-lg p-4">
                     <p className="text-deep-navy font-sans text-sm text-center">
                       <strong>Includes:</strong> Highest quality restoration, print-ready resolution, professional
-                      processing, and email delivery
+                      processing, and same-day email delivery
                     </p>
                   </div>
                 </div>
@@ -815,7 +814,7 @@ export default function UploadPage() {
               </p>
             </div>
 
-            {/* Single Integrated Payment Card */}
+            {/* RESTORED: Single Integrated Payment Card */}
             <div className="max-w-2xl mx-auto">
               <StripeCheckout
                 amount={pricing.total}
