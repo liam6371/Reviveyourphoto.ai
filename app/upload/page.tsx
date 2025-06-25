@@ -138,18 +138,18 @@ export default function UploadPage() {
     addDebugInfo(`Selected services: ${selectedServices.join(", ")}`)
     addDebugInfo(`Selected files: ${selectedFiles.length}`)
 
-    // Enhanced validation
+    // Enhanced validation with better user feedback
     if (selectedServices.length === 0) {
       const errorMsg = "Please select at least one restoration service before processing."
       addDebugInfo(`ERROR: ${errorMsg}`)
-      alert(errorMsg)
+      setProcessingError(errorMsg)
       return
     }
 
     if (selectedFiles.length === 0) {
       const errorMsg = "Please select at least one photo to process."
       addDebugInfo(`ERROR: ${errorMsg}`)
-      alert(errorMsg)
+      setProcessingError(errorMsg)
       return
     }
 
@@ -181,7 +181,9 @@ export default function UploadPage() {
         addDebugInfo(`API response status: ${response.status}`)
 
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
+          const errorText = await response.text()
+          addDebugInfo(`API error response: ${errorText}`)
+          throw new Error(`HTTP error! status: ${response.status} - ${errorText}`)
         }
 
         const result = await response.json()
@@ -215,14 +217,21 @@ export default function UploadPage() {
       addDebugInfo(`All files processed successfully. Results: ${results.length}`)
       setRestorationResults(results)
 
+      // Force step progression
       addDebugInfo("Setting step to 3 (Preview)")
       setStep(3)
-      addDebugInfo("Step should now be 3")
+      addDebugInfo("Step progression completed")
+
+      // Scroll to top to show results
+      window.scrollTo({ top: 0, behavior: "smooth" })
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Failed to process photos"
       addDebugInfo(`PROCESSING ERROR: ${errorMsg}`)
       console.error("Processing error:", error)
       setProcessingError(errorMsg)
+
+      // Show user-friendly error message
+      alert(`Processing failed: ${errorMsg}. Please check your internet connection and try again.`)
     } finally {
       setIsProcessing(false)
       addDebugInfo("Processing state set to false")
@@ -598,6 +607,25 @@ Don't worry - your photos are ready! You can:
               </Card>
             )}
 
+            {processingError && (
+              <Card className="bg-red-50 border-red-200 mb-6">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                    <p className="text-red-700 font-sans text-sm">{processingError}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 text-red-600 border-red-300 hover:bg-red-50"
+                    onClick={() => setProcessingError(null)}
+                  >
+                    Try Again
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="grid gap-6">
               {services.map((service) => (
                 <Card
@@ -701,7 +729,7 @@ Don't worry - your photos are ready! You can:
               </Button>
               <Button
                 size="lg"
-                className="bg-rich-coral hover:bg-rich-coral/90 text-white px-10 py-4 rounded-full font-sans"
+                className="bg-rich-coral hover:bg-rich-coral/90 text-white px-10 py-4 rounded-full font-sans disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={processPhotos}
                 disabled={selectedServices.length === 0 || isProcessing}
               >
