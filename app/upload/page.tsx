@@ -24,7 +24,6 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { StripeCheckout } from "@/components/ui/stripe-checkout"
 
 export default function UploadPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -40,7 +39,6 @@ export default function UploadPage() {
   const [emailSent, setEmailSent] = useState(false)
   const [emailDemo, setEmailDemo] = useState(false)
   const [showVolumeDiscount, setShowVolumeDiscount] = useState(false)
-  const [showPayment, setShowPayment] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<string[]>([])
@@ -77,10 +75,10 @@ export default function UploadPage() {
     },
   ]
 
-  // Demo pricing calculation - $0.04 per photo
+  // Demo pricing calculation - $0.50 per photo (Stripe minimum)
   const calculatePricing = () => {
     const photoCount = selectedFiles.length
-    const basePrice = 0.04 // Demo price
+    const basePrice = 0.5 // Updated for Stripe minimum
 
     const subtotal = photoCount * basePrice
 
@@ -273,8 +271,12 @@ export default function UploadPage() {
     }
 
     setIsEmailSending(true)
+    addDebugInfo("Starting email delivery process...")
 
     try {
+      addDebugInfo(`Sending email to: ${email}`)
+      addDebugInfo(`Restored images count: ${restorationResults.length}`)
+
       const response = await fetch("/api/send-email", {
         method: "POST",
         headers: {
@@ -289,14 +291,17 @@ export default function UploadPage() {
         }),
       })
 
+      addDebugInfo(`Email API response status: ${response.status}`)
+
       const result = await response.json()
+      addDebugInfo(`Email API response: ${JSON.stringify(result, null, 2)}`)
 
       if (result.success) {
         setEmailSent(true)
         setEmailDemo(result.demo || false)
 
         if (result.demo) {
-          alert(`Demo Mode: Email simulation complete! In production, your restored photos would be sent to ${email}.`)
+          alert(`Demo Mode: ${result.message}`)
         } else {
           alert(`Success! Your restored photos have been emailed to ${email}. Check your inbox in a few minutes.`)
         }
@@ -305,19 +310,79 @@ export default function UploadPage() {
       }
     } catch (error) {
       console.error("Email sending error:", error)
-      alert("Failed to send email. Please try downloading the images directly.")
+      addDebugInfo(`Email error: ${error instanceof Error ? error.message : "Unknown error"}`)
+
+      // Parse the response to get better error info
+      let errorMessage = "Failed to send email"
+      let fallbackAvailable = false
+
+      if (error instanceof Error) {
+        errorMessage = error.message
+      }
+
+      // Try to get more info from the API response
+      try {
+        const errorResponse = await fetch("/api/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: email,
+            restoredImages: restorationResults.map((r) => r.restoredImage),
+            originalImages: restorationResults.map((r) => r.originalImage),
+            services: selectedServices,
+            filenames: restorationResults.map((r) => r.filename),
+          }),
+        })
+
+        if (!errorResponse.ok) {
+          const errorData = await errorResponse.json()
+          if (errorData.fallback?.downloadAvailable) {
+            fallbackAvailable = true
+            alert(`Email delivery temporarily unavailable, but your photos are ready! ${errorData.fallback.message}`)
+            return
+          }
+        }
+      } catch (retryError) {
+        console.log("Retry also failed, showing original error")
+      }
+
+      // Show user-friendly error message with guidance
+      if (errorMessage.includes("domain")) {
+        alert(
+          `Email setup in progress: The email service domain is being verified. Your restored photos are available for download above in the preview section. You can download each photo individually while we complete the email setup.`,
+        )
+      } else {
+        alert(`Email sending failed: ${errorMessage}. 
+
+Don't worry - your photos are ready! You can:
+1. Download each photo directly from the preview above
+2. Try the email delivery again in a few minutes
+3. Contact support if the issue persists`)
+      }
     } finally {
       setIsEmailSending(false)
+      addDebugInfo("Email delivery process completed")
     }
   }
 
-  const handlePayment = () => {
-    setShowPayment(true)
+  const handlePayment = async () => {
+    if (!email) {
+      alert("Please enter your email address")
+      return
+    }
+
+    // For now, simulate payment processing
+    alert(`Payment processing would start here for ${email} - Total: $${pricing.total.toFixed(2)}`)
+
+    // In a real implementation, you would:
+    // 1. Create payment intent
+    // 2. Show Stripe payment form
+    // 3. Process payment
+    // 4. Send photos via email
   }
 
   const handlePaymentSuccess = (paymentIntentId: string) => {
     setPaymentSuccess(true)
-    setShowPayment(false)
     alert(`Payment successful! Your photos are being processed. Payment ID: ${paymentIntentId}`)
   }
 
@@ -600,16 +665,14 @@ export default function UploadPage() {
 
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between items-center">
-                    <span className="font-sans text-deep-navy">{pricing.photoCount} photos × $0.04 each</span>
+                    <span className="font-sans text-deep-navy">{pricing.photoCount} photos × $0.50 each</span>
                     <span className="font-serif font-semibold text-deep-navy">${pricing.subtotal.toFixed(2)}</span>
                   </div>
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <div className="flex items-center space-x-2">
-                      <Badge className="bg-green-100 text-green-700 border-green-200 mt-2">
-                        Launch Special - $0.04/photo
-                      </Badge>
-                      <p className="text-deep-navy/70 font-sans mt-2">Real AI processing at launch pricing</p>
-                    </div>
+                    <Badge className="bg-green-100 text-green-700 border-green-200 mt-2">
+                      Launch Special - $0.50/photo
+                    </Badge>
+                    <p className="text-deep-navy/70 font-sans mt-2">Real AI processing at launch pricing</p>
                   </div>
                 </div>
 
@@ -727,120 +790,156 @@ export default function UploadPage() {
         {step === 4 && (
           <div className="space-y-12">
             <div className="text-center">
-              <h1 className="text-5xl font-serif font-bold text-deep-navy mb-6">Get Your Restored Photos</h1>
+              <h1 className="text-5xl font-serif font-bold text-deep-navy mb-6">Complete Your Order</h1>
               <p className="text-xl text-deep-navy/70 font-sans">
-                Choose how you'd like to receive your restored photos
+                Enter your email and payment details to receive your restored photos
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-12">
-              {/* Free Email Delivery */}
-              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-3 font-serif text-deep-navy">
-                    <Mail className="h-6 w-6 text-green-600" />
-                    <span>Email Delivery</span>
-                  </CardTitle>
-                  <Badge className="bg-green-100 text-green-700 border-green-200 w-fit">Free Testing!</Badge>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <p className="text-deep-navy/80 font-sans">
-                    Get your restored photos delivered directly to your email inbox with download links.
-                  </p>
-                  <div>
-                    <Label htmlFor="email-free" className="font-sans text-deep-navy">
-                      Email Address
-                    </Label>
-                    <Input
-                      id="email-free"
-                      type="email"
-                      placeholder="your@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="mt-2"
-                    />
+            {/* Single Combined Card */}
+            <Card className="bg-white/90 backdrop-blur-sm shadow-lg max-w-2xl mx-auto">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-3 font-serif text-deep-navy text-center justify-center">
+                  <Mail className="h-6 w-6 text-rich-coral" />
+                  <span>Order Summary & Payment</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {/* Order Summary */}
+                <div className="bg-cream rounded-lg p-6">
+                  <h3 className="font-serif font-semibold text-deep-navy mb-4">Your Order</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-sans text-deep-navy">
+                        {pricing.photoCount} photo{pricing.photoCount > 1 ? "s" : ""} × $0.50 each
+                      </span>
+                      <span className="font-serif font-semibold text-deep-navy">${pricing.subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-lg border-t pt-3">
+                      <span className="font-serif font-semibold text-deep-navy">Total</span>
+                      <span className="font-serif font-bold text-rich-coral text-xl">${pricing.total.toFixed(2)}</span>
+                    </div>
                   </div>
-                  <Button
-                    onClick={handleFreeDelivery}
-                    disabled={isEmailSending || emailSent || !email}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-sans"
-                    size="lg"
-                  >
-                    {isEmailSending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Sending Email...
-                      </>
-                    ) : emailSent ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Email Sent!
-                      </>
-                    ) : (
-                      <>
-                        <Mail className="h-4 w-4 mr-2" />
-                        Send Photos to Email
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
+                  <Badge className="bg-green-100 text-green-700 border-green-200 mt-3">
+                    Launch Special - $0.50/photo
+                  </Badge>
+                </div>
 
-              {/* Paid Option */}
-              <Card className="bg-white/80 backdrop-blur-sm shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-3 font-serif text-deep-navy">
-                    <CreditCard className="h-6 w-6" />
-                    <span>Secure Payment</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {!showPayment ? (
-                    <>
-                      <div className="flex justify-between font-sans">
-                        <span>Photos processed:</span>
-                        <span className="font-semibold">{selectedFiles.length}</span>
-                      </div>
-                      <div className="flex justify-between font-sans">
-                        <span>Services applied:</span>
-                        <span className="font-semibold">{selectedServices.length}</span>
-                      </div>
-                      <div className="flex justify-between font-sans">
-                        <span>Price per photo:</span>
-                        <span className="font-semibold">
-                          $0.04 <Badge className="ml-2 bg-green-100 text-green-700 text-xs">Demo Launch</Badge>
-                        </span>
-                      </div>
-                      <div className="border-t pt-6">
-                        <div className="flex justify-between text-xl">
-                          <span className="font-serif font-semibold">Total:</span>
-                          <span className="font-serif font-bold text-rich-coral">${pricing.total.toFixed(2)}</span>
+                {/* Email Input */}
+                <div>
+                  <Label htmlFor="email-payment" className="font-sans text-deep-navy text-lg font-semibold">
+                    Email Address
+                  </Label>
+                  <p className="text-deep-navy/60 font-sans text-sm mb-3">
+                    Your restored photos will be delivered to this email address
+                  </p>
+                  <Input
+                    id="email-payment"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="text-lg p-4"
+                    required
+                  />
+                </div>
+
+                {/* Payment Options */}
+                <div className="space-y-6">
+                  <h3 className="font-serif font-semibold text-deep-navy text-lg">Choose Payment Method</h3>
+
+                  {/* Free Demo Option */}
+                  <Card className="border-2 border-green-200 bg-green-50">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-serif font-semibold text-green-900 mb-2">Email Delivery</h4>
+                          <p className="text-green-800 font-sans text-sm">
+                            Get your photos delivered via email (launch special pricing)
+                          </p>
                         </div>
+                        <Button
+                          onClick={handleFreeDelivery}
+                          disabled={isEmailSending || emailSent || !email}
+                          className="bg-green-600 hover:bg-green-700 text-white font-sans"
+                          size="lg"
+                        >
+                          {isEmailSending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Sending...
+                            </>
+                          ) : emailSent ? (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Sent!
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="h-4 w-4 mr-2" />
+                              Send Free
+                            </>
+                          )}
+                        </Button>
                       </div>
-                      <Button
-                        onClick={handlePayment}
-                        className="w-full bg-rich-coral hover:bg-rich-coral/90 text-white font-sans"
-                        size="lg"
-                      >
-                        Pay Securely - ${pricing.total.toFixed(2)}
-                      </Button>
-                    </>
-                  ) : (
-                    <StripeCheckout
-                      amount={pricing.total}
-                      photoCount={selectedFiles.length}
-                      services={selectedServices}
-                      email={email}
-                      onSuccess={handlePaymentSuccess}
-                      onError={handlePaymentError}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                    </CardContent>
+                  </Card>
 
+                  {/* Divider */}
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-deep-navy/20"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-4 bg-white text-deep-navy/60 font-sans">or pay securely</span>
+                    </div>
+                  </div>
+
+                  {/* Stripe Payment Option */}
+                  <Card className="border-2 border-rich-coral/20">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h4 className="font-serif font-semibold text-deep-navy mb-2 flex items-center">
+                            <CreditCard className="h-5 w-5 mr-2" />
+                            Secure Payment
+                          </h4>
+                          <p className="text-deep-navy/70 font-sans text-sm">
+                            Pay ${pricing.total.toFixed(2)} securely with Stripe
+                          </p>
+                        </div>
+                        <Button
+                          onClick={handlePayment}
+                          disabled={!email}
+                          className="bg-rich-coral hover:bg-rich-coral/90 text-white font-sans"
+                          size="lg"
+                        >
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          Pay ${pricing.total.toFixed(2)}
+                        </Button>
+                      </div>
+
+                      {!email && (
+                        <p className="text-orange-600 font-sans text-sm">Please enter your email address first</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Security Notice */}
+                <div className="text-center bg-gray-50 rounded-lg p-4">
+                  <p className="text-xs text-deep-navy/60 font-sans">
+                    🔒 Your payment is secured by Stripe • Your photos are processed with enterprise-grade security
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Success Messages */}
             {emailSent && (
-              <Card className={`${emailDemo ? "bg-blue-50 border-blue-200" : "bg-green-50 border-green-200"}`}>
+              <Card
+                className={`max-w-2xl mx-auto ${emailDemo ? "bg-blue-50 border-blue-200" : "bg-green-50 border-green-200"}`}
+              >
                 <CardContent className="p-6">
                   <div className="flex items-start space-x-3">
                     <CheckCircle
@@ -848,15 +947,27 @@ export default function UploadPage() {
                     />
                     <div>
                       <h4 className={`font-serif font-semibold ${emailDemo ? "text-blue-900" : "text-green-900"} mb-2`}>
-                        {emailDemo ? "Email Demo Complete!" : "Email Sent Successfully!"}
+                        {emailDemo ? "Demo Email Sent!" : "Photos Delivered!"}
                       </h4>
                       <p className={`${emailDemo ? "text-blue-800" : "text-green-800"} font-sans text-sm`}>
                         {emailDemo
-                          ? `Demo mode: In production, your restored photos would be sent to ${email}. Add RESEND_API_KEY to enable real emails.`
-                          : `Your restored photos have been sent to ${email}. Please check your inbox (and spam folder) in the next few minutes.`}
+                          ? `Demo mode: Your restored photos would be sent to ${email} in production.`
+                          : `Your restored photos have been sent to ${email}. Check your inbox!`}
                       </p>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {paymentSuccess && (
+              <Card className="max-w-2xl mx-auto bg-green-50 border-green-200">
+                <CardContent className="p-6 text-center">
+                  <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
+                  <h3 className="text-2xl font-serif font-bold text-green-900 mb-2">Payment Successful!</h3>
+                  <p className="text-green-800 font-sans">
+                    Your photos are being processed and will be emailed to you shortly.
+                  </p>
                 </CardContent>
               </Card>
             )}

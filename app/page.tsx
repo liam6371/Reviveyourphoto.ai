@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { VideoDemo } from "@/components/ui/video-demo"
 import {
   Upload,
   Palette,
@@ -127,40 +128,8 @@ export default function HomePage() {
             enhance quality to preserve your most treasured memories forever.
           </p>
 
-          {/* Video Demo */}
-          <div className="mb-12">
-            <div className="relative max-w-3xl mx-auto">
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-deep-navy/5 to-rich-coral/5">
-                <video
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-96 object-cover"
-                  poster="/placeholder.svg?height=400&width=800"
-                >
-                  <source src="/restoration-demo.mp4" type="video/mp4" />
-                  {/* Fallback for browsers that don't support video */}
-                  <div className="h-96 flex items-center justify-center bg-gradient-to-r from-gray-300 to-gray-400">
-                    <div className="text-center">
-                      <Sparkles className="h-16 w-16 text-rich-coral mx-auto mb-4" />
-                      <p className="text-deep-navy font-serif text-xl">AI Photo Restoration Demo</p>
-                    </div>
-                  </div>
-                </video>
-
-                {/* Video overlay with branding */}
-                <div className="absolute bottom-6 left-6">
-                  <Badge className="bg-white/90 text-deep-navy border-deep-navy/20 font-sans">⚡ Live AI Demo</Badge>
-                </div>
-
-                {/* Play/Pause button overlay (optional) */}
-                <div className="absolute top-6 right-6">
-                  <Badge className="bg-black/50 text-white border-white/20 font-sans">🎬 Demo Video</Badge>
-                </div>
-              </div>
-            </div>
-          </div>
+          {/* Video Demo Component */}
+          <VideoDemo />
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
             <Button
@@ -190,7 +159,7 @@ export default function HomePage() {
             </div>
             <div className="flex items-center space-x-2">
               <Clock className="h-4 w-4" />
-              <span>24-48 Hour Delivery</span>
+              <span>Same Day Delivery</span>
             </div>
             <div className="flex items-center space-x-2">
               <Star className="h-4 w-4" />
@@ -395,21 +364,21 @@ export default function HomePage() {
             {/* Standard Pricing - Demo Version */}
             <Card className="border-2 border-rich-coral/20 shadow-2xl bg-white/90 backdrop-blur-sm">
               <CardHeader className="bg-gradient-to-br from-rich-coral/5 to-rich-coral/10 text-center border-b border-rich-coral/10">
-                <CardTitle className="text-3xl font-serif text-deep-navy">Launch Pricing</CardTitle>
+                <CardTitle className="text-3xl font-serif text-deep-navy">Launch Special</CardTitle>
                 <div className="text-6xl font-serif font-bold text-rich-coral mt-6">
-                  $0.04
+                  $0.50
                   <span className="text-lg font-sans font-normal text-deep-navy/60">/photo</span>
                 </div>
                 <Badge className="bg-green-100 text-green-700 border-green-200 mt-2">
-                  Limited Time - Launch Special
+                  Limited Time - Launch Pricing
                 </Badge>
-                <p className="text-deep-navy/70 font-sans mt-2">Professional AI restoration at launch pricing</p>
+                <p className="text-deep-navy/70 font-sans mt-2">Professional AI restoration at introductory pricing</p>
               </CardHeader>
               <CardContent className="p-10">
                 <ul className="space-y-6 text-left">
                   {[
                     "All restoration services included",
-                    "Advanced AI processing with Replicate",
+                    "Real AI processing with Replicate",
                     "High-resolution output (300+ DPI)",
                     "Email delivery with download links",
                     "100% satisfaction guarantee",
@@ -443,7 +412,7 @@ export default function HomePage() {
                   </div>
                   <div className="bg-blue-50 rounded-lg p-4">
                     <p className="text-blue-800 font-sans text-sm">
-                      <strong>Demo Special:</strong> Try our AI restoration for just $0.04 per photo during our launch
+                      <strong>Demo Special:</strong> Try our AI restoration for just $0.50 per photo during our launch
                       period!
                     </p>
                   </div>

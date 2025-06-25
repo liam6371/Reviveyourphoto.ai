@@ -1,8 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-// Check if we have a valid Replicate token
-const DEMO_MODE = !process.env.REPLICATE_API_TOKEN || process.env.REPLICATE_API_TOKEN.length < 10
-
 async function simulateProcessing(delay = 2000) {
   return new Promise((resolve) => setTimeout(resolve, delay))
 }
@@ -24,27 +21,22 @@ export async function POST(request: NextRequest) {
     const dataUrl = `data:${file.type};base64,${base64}`
 
     console.log("Processing request with services:", services)
-    console.log("Demo mode:", DEMO_MODE)
-    console.log("Replicate token exists:", !!process.env.REPLICATE_API_TOKEN)
-    console.log("Replicate token length:", process.env.REPLICATE_API_TOKEN?.length || 0)
 
-    // Demo mode - simulate processing without Replicate
-    if (DEMO_MODE) {
-      console.log("Running in demo mode - simulating photo restoration...")
+    // Check if Replicate is configured
+    if (!process.env.REPLICATE_API_TOKEN) {
+      console.log("Replicate not configured, falling back to demo mode...")
 
-      // Simulate processing time
-      await simulateProcessing(3000)
+      // Simulate processing time for demo fallback
+      await new Promise((resolve) => setTimeout(resolve, 3000))
 
-      // Return the original image as "restored" for demo purposes
       return NextResponse.json({
         success: true,
         originalImage: dataUrl,
-        restoredImage: dataUrl, // Using original as demo
-        model: "demo-mode",
+        restoredImage: dataUrl,
+        model: "demo-fallback",
         services: services,
         demo: true,
-        message:
-          "Demo mode: In production, this would be processed with Replicate AI. Add a valid REPLICATE_API_TOKEN to enable real processing.",
+        message: "Demo mode: Add REPLICATE_API_TOKEN to enable real AI processing.",
       })
     }
 
@@ -122,7 +114,7 @@ export async function POST(request: NextRequest) {
       restoredImage: restoredImageUrl,
       model: model,
       services: services,
-      demo: false,
+      demo: false, // Always false for real processing
     })
   } catch (error) {
     console.error("Restoration error:", error)
