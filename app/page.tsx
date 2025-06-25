@@ -364,15 +364,12 @@ export default function HomePage() {
             {/* Standard Pricing - Demo Version */}
             <Card className="border-2 border-rich-coral/20 shadow-2xl bg-white/90 backdrop-blur-sm">
               <CardHeader className="bg-gradient-to-br from-rich-coral/5 to-rich-coral/10 text-center border-b border-rich-coral/10">
-                <CardTitle className="text-3xl font-serif text-deep-navy">Launch Special</CardTitle>
+                <CardTitle className="text-3xl font-serif text-deep-navy">Standard Pricing</CardTitle>
                 <div className="text-6xl font-serif font-bold text-rich-coral mt-6">
-                  $0.50
+                  $8
                   <span className="text-lg font-sans font-normal text-deep-navy/60">/photo</span>
                 </div>
-                <Badge className="bg-green-100 text-green-700 border-green-200 mt-2">
-                  Limited Time - Launch Pricing
-                </Badge>
-                <p className="text-deep-navy/70 font-sans mt-2">Professional AI restoration at introductory pricing</p>
+                <p className="text-deep-navy/70 font-sans mt-2">Professional AI restoration</p>
               </CardHeader>
               <CardContent className="p-10">
                 <ul className="space-y-6 text-left">
@@ -395,26 +392,21 @@ export default function HomePage() {
             {/* Volume Discounts - Simplified for Demo */}
             <Card className="border-2 border-deep-navy/20 shadow-2xl bg-white/90 backdrop-blur-sm">
               <CardHeader className="bg-gradient-to-br from-deep-navy/5 to-deep-navy/10 text-center border-b border-deep-navy/10">
-                <CardTitle className="text-3xl font-serif text-deep-navy">Coming Soon</CardTitle>
-                <p className="text-deep-navy/70 font-sans mt-2">Full launch pricing</p>
+                <CardTitle className="text-3xl font-serif text-deep-navy">Volume Discounts</CardTitle>
+                <p className="text-deep-navy/70 font-sans mt-2">Discounts for larger orders</p>
               </CardHeader>
               <CardContent className="p-10">
                 <div className="space-y-6 text-center">
                   <div className="py-6">
-                    <h4 className="font-serif font-semibold text-deep-navy mb-4">After Demo Period:</h4>
+                    <h4 className="font-serif font-semibold text-deep-navy mb-4">Volume Pricing:</h4>
                     <div className="space-y-3 text-deep-navy/70">
                       <p className="font-sans">
                         Single photos: <span className="font-semibold">$8 each</span>
                       </p>
-                      <p className="font-sans">Volume discounts available</p>
+                      <p className="font-sans">5-10 photos: $6 each</p>
+                      <p className="font-sans">10+ photos: $4 each</p>
                       <p className="font-sans">Professional quality guaranteed</p>
                     </div>
-                  </div>
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <p className="text-blue-800 font-sans text-sm">
-                      <strong>Demo Special:</strong> Try our AI restoration for just $0.50 per photo during our launch
-                      period!
-                    </p>
                   </div>
                 </div>
               </CardContent>

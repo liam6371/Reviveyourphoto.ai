@@ -84,50 +84,20 @@ export async function POST(request: NextRequest) {
     // For paid orders, try harder to send real emails
     const isPaidOrder = !!paid && !!paymentIntentId
 
-    // Demo mode if no Resend API key AND not a paid order
     if (!resend || !process.env.RESEND_API_KEY) {
-      if (isPaidOrder) {
-        console.log("PAID ORDER but no Resend API key - this is a problem!")
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Email service not configured for paid orders. Please contact support with your payment ID.",
-            paymentIntentId,
-          },
-          { status: 500 },
-        )
-      }
-
-      console.log("Demo mode: Simulating email send to:", email)
-
-      // Simulate email processing delay
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      return NextResponse.json({
-        success: true,
-        message: `Demo: Email would be sent to ${email} with ${restoredImages.length} restored photo(s). Add RESEND_API_KEY to enable real emails.`,
-        emailSent: true,
-        demo: true,
-      })
+      console.log("Resend API key missing - this is a problem!")
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Email service not configured. Please contact support with your payment ID.",
+          paymentIntentId,
+        },
+        { status: 500 },
+      )
     }
 
     // Check if this is the verified email address OR if it's a paid order
     const isVerifiedEmail = email.toLowerCase() === VERIFIED_EMAIL.toLowerCase()
-
-    if (!isVerifiedEmail && !isPaidOrder) {
-      console.log(`Email ${email} is not verified and not a paid order. Using demo mode.`)
-
-      // Simulate email processing delay
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      return NextResponse.json({
-        success: true,
-        message: `Demo Mode: Email simulation sent to ${email} with ${restoredImages.length} restored photo(s). Real emails are currently limited to verified addresses during testing. Your photos are ready for download!`,
-        emailSent: true,
-        demo: true,
-        reason: "unverified_recipient",
-      })
-    }
 
     // Real email sending with Resend (for verified email OR paid orders)
     console.log("Sending real email via Resend to:", email, isPaidOrder ? "(PAID ORDER)" : "(VERIFIED EMAIL)")
@@ -334,7 +304,6 @@ export async function POST(request: NextRequest) {
         message: `${isPaidOrder ? "Payment confirmed! " : ""}Real email sent successfully to ${email}! Check your inbox for ${processedImages.length} professionally restored photos.`,
         emailSent: true,
         emailId: data?.id,
-        demo: false,
         verified: true,
         paid: isPaidOrder,
         paymentIntentId: isPaidOrder ? paymentIntentId : undefined,
@@ -357,42 +326,17 @@ export async function POST(request: NextRequest) {
 
       // Provide more specific error information and better fallbacks
       let errorMessage = "Failed to send email"
-      let shouldFallbackToDemo = false
+      const shouldFallbackToDemo = false
 
       if (emailError instanceof Error) {
         if (emailError.message.includes("API key") || emailError.message.includes("Authentication")) {
           errorMessage = "Email service configuration error"
-          shouldFallbackToDemo = true
         } else if (emailError.message.includes("rate limit")) {
           errorMessage = "Email rate limit exceeded - please try again in a few minutes"
         } else if (emailError.message.includes("domain") || emailError.message.includes("Domain")) {
           errorMessage = "Email domain verification in progress"
-          shouldFallbackToDemo = true
         } else {
           errorMessage = `Email service error: ${emailError.message}`
-          shouldFallbackToDemo = true
-        }
-      }
-
-      // If we should fallback to demo mode, try that instead of failing
-      if (shouldFallbackToDemo) {
-        console.log("Falling back to demo mode due to email service issue...")
-
-        try {
-          // Simulate email processing delay
-          await new Promise((resolve) => setTimeout(resolve, 2000))
-
-          return NextResponse.json({
-            success: true,
-            message: `Demo Mode: Your restored photos are ready! In production, they would be emailed to ${email}. Email service is being configured - you can download your photos directly from the preview.`,
-            emailSent: true,
-            demo: true,
-            reason: "email_service_unavailable",
-            imageUrls: processedImages.map((img) => img.url),
-            downloadReady: true,
-          })
-        } catch (fallbackError) {
-          console.error("Fallback also failed:", fallbackError)
         }
       }
 

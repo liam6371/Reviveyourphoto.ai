@@ -30,14 +30,13 @@ export function VideoDemo() {
                 onError={handleVideoError}
               >
                 <source src="/restoration-demo.mp4" type="video/mp4" />
-                <source src="/restoration-demo.webm" type="video/webm" />
               </video>
 
               {/* Video overlay with branding */}
               <div className="absolute bottom-6 left-6">
                 <Badge className="bg-white/90 text-deep-navy border-deep-navy/20 font-sans">
                   <Sparkles className="h-4 w-4 mr-2" />
-                  AI Demo
+                  AI Powered
                 </Badge>
               </div>
 
@@ -45,7 +44,7 @@ export function VideoDemo() {
               <div className="absolute top-6 right-6">
                 <Badge className="bg-black/50 text-white border-white/20 font-sans">
                   <Play className="h-4 w-4 mr-2" />
-                  Live Demo
+                  Watch Now
                 </Badge>
               </div>
             </>
@@ -89,7 +88,7 @@ export function VideoDemo() {
               <div className="absolute bottom-6 left-6">
                 <Badge className="bg-white/90 text-deep-navy border-deep-navy/20 font-sans">
                   <Sparkles className="h-4 w-4 mr-2" />
-                  AI Demo
+                  AI Powered
                 </Badge>
               </div>
             </div>

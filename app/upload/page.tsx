@@ -10,18 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { RestorationPreview } from "@/components/ui/restoration-preview"
-import {
-  Upload,
-  X,
-  CreditCard,
-  ArrowLeft,
-  Camera,
-  CheckCircle,
-  Loader2,
-  Mail,
-  Sparkles,
-  AlertTriangle,
-} from "lucide-react"
+import { Upload, X, ArrowLeft, Camera, CheckCircle, Loader2, Mail, Sparkles, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { StripeCheckout } from "@/components/ui/stripe-checkout"
@@ -34,11 +23,9 @@ export default function UploadPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [restorationResults, setRestorationResults] = useState<any[]>([])
   const [processingError, setProcessingError] = useState<string | null>(null)
-  const [isDemoMode, setIsDemoMode] = useState(false)
   const [email, setEmail] = useState("")
   const [isEmailSending, setIsEmailSending] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
-  const [emailDemo, setEmailDemo] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [debugInfo, setDebugInfo] = useState<string[]>([])
@@ -156,7 +143,6 @@ export default function UploadPage() {
     setIsProcessing(true)
     setProcessingError(null)
     setRestorationResults([])
-    setIsDemoMode(false)
     addDebugInfo("Processing state set to true")
 
     try {
@@ -195,18 +181,13 @@ export default function UploadPage() {
             restoredImage: result.restoredImage,
             filename: file.name,
             services: selectedServices,
-            isDemo: result.demo || false,
+            isDemo: false,
             demoMessage: result.message,
             model: result.model,
           }
 
           results.push(processedResult)
           addDebugInfo(`Successfully processed file ${i + 1}`)
-
-          if (result.demo) {
-            setIsDemoMode(true)
-            addDebugInfo("Demo mode detected")
-          }
         } else {
           const errorMsg = result.error || "Failed to process image"
           addDebugInfo(`Processing failed: ${errorMsg}`)
@@ -303,15 +284,8 @@ export default function UploadPage() {
 
       if (result.success) {
         setEmailSent(true)
-        setEmailDemo(result.demo || false)
 
-        if (result.demo) {
-          alert(
-            `Payment successful! Demo mode: Your photos would be emailed to ${email} in production. Payment ID: ${paymentIntentId}`,
-          )
-        } else {
-          alert(`Payment successful! Your restored photos have been sent to ${email}. Payment ID: ${paymentIntentId}`)
-        }
+        alert(`Payment successful! Your restored photos have been sent to ${email}. Payment ID: ${paymentIntentId}`)
       } else {
         alert(
           `Payment successful (ID: ${paymentIntentId}), but email delivery failed. Please contact support with your payment ID to receive your photos.`,
@@ -752,113 +726,22 @@ export default function UploadPage() {
             <div className="text-center">
               <h1 className="text-5xl font-serif font-bold text-deep-navy mb-6">Complete Your Order</h1>
               <p className="text-xl text-deep-navy/70 font-sans">
-                Enter your email and complete payment. Your restored photos will be automatically emailed to you after
+                Enter your email and payment details. Your restored photos will be automatically emailed after
                 successful payment.
               </p>
             </div>
 
-            {/* Single Payment Card */}
-            <Card className="bg-white/90 backdrop-blur-sm shadow-lg max-w-2xl mx-auto">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-3 font-serif text-deep-navy text-center justify-center">
-                  <CreditCard className="h-6 w-6 text-rich-coral" />
-                  <span>Secure Payment & Email Delivery</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-8">
-                {/* Order Summary */}
-                <div className="bg-cream rounded-lg p-6">
-                  <h3 className="font-serif font-semibold text-deep-navy mb-4">Your Order</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="font-sans text-deep-navy">
-                        {pricing.photoCount} photo{pricing.photoCount > 1 ? "s" : ""} × $0.50 each
-                      </span>
-                      <span className="font-serif font-semibold text-deep-navy">${pricing.subtotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-lg border-t pt-3">
-                      <span className="font-serif font-semibold text-deep-navy">Total</span>
-                      <span className="font-serif font-bold text-rich-coral text-xl">${pricing.total.toFixed(2)}</span>
-                    </div>
-                  </div>
-                  <Badge className="bg-green-100 text-green-700 border-green-200 mt-3">
-                    Launch Special - $0.50/photo
-                  </Badge>
-                </div>
-
-                {/* Email Input */}
-                <div>
-                  <Label htmlFor="email-payment" className="font-sans text-deep-navy text-lg font-semibold">
-                    Email Address
-                  </Label>
-                  <p className="text-deep-navy/60 font-sans text-sm mb-3">
-                    Your restored photos will be automatically emailed to this address after payment
-                  </p>
-                  <Input
-                    id="email-payment"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="text-lg p-4"
-                    required
-                  />
-                </div>
-
-                {/* Payment Flow */}
-                <div className="bg-blue-50 rounded-lg p-6">
-                  <h4 className="font-serif font-semibold text-blue-900 mb-3">What happens next:</h4>
-                  <div className="space-y-2 text-blue-800 font-sans text-sm">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                        1
-                      </div>
-                      <span>Enter your payment details securely with Stripe</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                        2
-                      </div>
-                      <span>Payment is processed instantly</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                        3
-                      </div>
-                      <span>Your restored photos are automatically emailed to you</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Stripe Payment Component */}
-                {email ? (
-                  <StripeCheckout
-                    amount={pricing.total}
-                    photoCount={pricing.photoCount}
-                    services={selectedServices}
-                    email={email}
-                    onSuccess={handlePaymentSuccess}
-                    onError={handlePaymentError}
-                  />
-                ) : (
-                  <Card className="border-2 border-orange-200 bg-orange-50">
-                    <CardContent className="p-6 text-center">
-                      <AlertTriangle className="h-8 w-8 text-orange-600 mx-auto mb-3" />
-                      <p className="text-orange-800 font-sans">
-                        Please enter your email address above to continue with payment
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Security Notice */}
-                <div className="text-center bg-gray-50 rounded-lg p-4">
-                  <p className="text-xs text-deep-navy/60 font-sans">
-                    🔒 Your payment is secured by Stripe • Photos are automatically emailed after successful payment
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Single Integrated Payment Card */}
+            <div className="max-w-2xl mx-auto">
+              <StripeCheckout
+                amount={pricing.total}
+                photoCount={pricing.photoCount}
+                services={selectedServices}
+                email={email} // Pass existing email as default
+                onSuccess={handlePaymentSuccess}
+                onError={handlePaymentError}
+              />
+            </div>
 
             {/* Success Messages */}
             {paymentSuccess && (

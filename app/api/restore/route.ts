@@ -1,9 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-async function simulateProcessing(delay = 2000) {
-  return new Promise((resolve) => setTimeout(resolve, delay))
-}
-
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
@@ -24,20 +20,14 @@ export async function POST(request: NextRequest) {
 
     // Check if Replicate is configured
     if (!process.env.REPLICATE_API_TOKEN) {
-      console.log("Replicate not configured, falling back to demo mode...")
-
-      // Simulate processing time for demo fallback
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-
-      return NextResponse.json({
-        success: true,
-        originalImage: dataUrl,
-        restoredImage: dataUrl,
-        model: "demo-fallback",
-        services: services,
-        demo: true,
-        message: "Demo mode: Add REPLICATE_API_TOKEN to enable real AI processing.",
-      })
+      console.error("Replicate API token is not configured.")
+      return NextResponse.json(
+        {
+          error: "Replicate API token is not configured. Please set the REPLICATE_API_TOKEN environment variable.",
+          success: false,
+        },
+        { status: 500 },
+      )
     }
 
     // Real Replicate processing
@@ -46,7 +36,10 @@ export async function POST(request: NextRequest) {
     // Validate token format
     if (!process.env.REPLICATE_API_TOKEN.startsWith("r8_")) {
       console.error("Invalid Replicate token format. Token should start with 'r8_'")
-      throw new Error("Invalid API token format")
+      return NextResponse.json(
+        { error: "Invalid Replicate token format. Token should start with 'r8_'.", success: false },
+        { status: 500 },
+      )
     }
 
     const replicate = new Replicate({
@@ -114,7 +107,6 @@ export async function POST(request: NextRequest) {
       restoredImage: restoredImageUrl,
       model: model,
       services: services,
-      demo: false, // Always false for real processing
     })
   } catch (error) {
     console.error("Restoration error:", error)
@@ -129,34 +121,6 @@ export async function POST(request: NextRequest) {
       // Handle specific Replicate errors
       if (error.message.includes("authentication") || error.message.includes("Authentication")) {
         errorMessage = "Authentication failed - please check API token"
-
-        // Fall back to demo mode for authentication errors
-        console.log("Authentication failed, falling back to demo mode...")
-
-        try {
-          const formData = await request.formData()
-          const file = formData.get("image") as File
-          const services = JSON.parse((formData.get("services") as string) || "[]")
-
-          const bytes = await file.arrayBuffer()
-          const buffer = Buffer.from(bytes)
-          const base64 = buffer.toString("base64")
-          const dataUrl = `data:${file.type};base64,${base64}`
-
-          await simulateProcessing(2000)
-
-          return NextResponse.json({
-            success: true,
-            originalImage: dataUrl,
-            restoredImage: dataUrl,
-            model: "demo-fallback",
-            services: services,
-            demo: true,
-            message: "Demo mode: Replicate authentication failed. Check your REPLICATE_API_TOKEN environment variable.",
-          })
-        } catch (fallbackError) {
-          console.error("Fallback also failed:", fallbackError)
-        }
       } else if (error.message.includes("quota") || error.message.includes("limit")) {
         errorMessage = "API quota exceeded - please try again later"
       } else if (error.message.includes("timeout")) {

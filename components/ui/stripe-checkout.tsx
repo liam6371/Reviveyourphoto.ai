@@ -33,9 +33,16 @@ function CheckoutForm({ amount, photoCount, services, email, onSuccess, onError 
   const elements = useElements()
   const [isProcessing, setIsProcessing] = useState(false)
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "processing" | "success" | "error">("idle")
+  const [localEmail, setLocalEmail] = useState(email || "")
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+
+    // Critical validation - prevent payment without email
+    if (!localEmail || !localEmail.includes("@")) {
+      onError("Please enter a valid email address before proceeding with payment")
+      return
+    }
 
     if (!stripe || !elements) {
       return
@@ -45,7 +52,7 @@ function CheckoutForm({ amount, photoCount, services, email, onSuccess, onError 
     setPaymentStatus("processing")
 
     try {
-      // Create payment intent
+      // Create payment intent with email
       const response = await fetch("/api/create-payment-intent", {
         method: "POST",
         headers: {
@@ -55,7 +62,7 @@ function CheckoutForm({ amount, photoCount, services, email, onSuccess, onError 
           amount,
           photoCount,
           services,
-          email,
+          email: localEmail, // Use the email from the form
         }),
       })
 
@@ -71,12 +78,12 @@ function CheckoutForm({ amount, photoCount, services, email, onSuccess, onError 
         throw new Error("Failed to create payment intent")
       }
 
-      // Confirm payment
+      // Confirm payment with email
       const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: elements.getElement(CardElement)!,
           billing_details: {
-            email: email,
+            email: localEmail,
           },
         },
       })
@@ -115,9 +122,7 @@ function CheckoutForm({ amount, photoCount, services, email, onSuccess, onError 
         <CardContent className="p-8 text-center">
           <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
           <h3 className="text-2xl font-serif font-bold text-green-900 mb-2">Payment Successful!</h3>
-          <p className="text-green-800 font-sans">
-            Your photos are now being processed. You'll receive them via email shortly.
-          </p>
+          <p className="text-green-800 font-sans">Your photos are now being processed and emailed to {localEmail}.</p>
         </CardContent>
       </Card>
     )
@@ -128,7 +133,7 @@ function CheckoutForm({ amount, photoCount, services, email, onSuccess, onError 
       <CardHeader>
         <CardTitle className="flex items-center space-x-3 font-serif text-deep-navy">
           <CreditCard className="h-6 w-6" />
-          <span>Secure Payment</span>
+          <span>Secure Payment & Email Delivery</span>
         </CardTitle>
         <div className="flex justify-between items-center">
           <span className="font-sans text-deep-navy/70">
@@ -146,8 +151,31 @@ function CheckoutForm({ amount, photoCount, services, email, onSuccess, onError 
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="p-4 border border-deep-navy/20 rounded-lg bg-white">
-            <CardElement options={cardElementOptions} />
+          {/* Email Input - Required Part of Payment Form */}
+          <div>
+            <label htmlFor="payment-email" className="block text-sm font-medium text-deep-navy mb-2">
+              Email Address *
+            </label>
+            <p className="text-deep-navy/60 font-sans text-sm mb-3">
+              Your restored photos will be automatically emailed here after payment
+            </p>
+            <input
+              id="payment-email"
+              type="email"
+              placeholder="your@email.com"
+              value={localEmail}
+              onChange={(e) => setLocalEmail(e.target.value)}
+              className="w-full p-4 border border-deep-navy/20 rounded-lg bg-white text-deep-navy text-lg focus:outline-none focus:ring-2 focus:ring-rich-coral focus:border-rich-coral"
+              required
+            />
+          </div>
+
+          {/* Card Element */}
+          <div>
+            <label className="block text-sm font-medium text-deep-navy mb-2">Payment Details *</label>
+            <div className="p-4 border border-deep-navy/20 rounded-lg bg-white">
+              <CardElement options={cardElementOptions} />
+            </div>
           </div>
 
           {paymentStatus === "error" && (
@@ -155,16 +183,35 @@ function CheckoutForm({ amount, photoCount, services, email, onSuccess, onError 
               <div className="flex items-center space-x-2">
                 <AlertCircle className="h-5 w-5 text-red-600" />
                 <p className="text-red-700 font-sans text-sm">
-                  Payment failed. Please check your card details and try again.
+                  Payment failed. Please check your details and try again.
                 </p>
               </div>
             </div>
           )}
 
+          {/* Payment Flow Info */}
+          <div className="bg-blue-50 rounded-lg p-4">
+            <h4 className="font-serif font-semibold text-blue-900 mb-2">What happens next:</h4>
+            <div className="space-y-1 text-blue-800 font-sans text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                  1
+                </div>
+                <span>Payment is processed securely</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                  2
+                </div>
+                <span>Photos are automatically emailed to {localEmail || "your email"}</span>
+              </div>
+            </div>
+          </div>
+
           <Button
             type="submit"
-            disabled={!stripe || isProcessing}
-            className="w-full bg-rich-coral hover:bg-rich-coral/90 text-white font-sans"
+            disabled={!stripe || isProcessing || !localEmail || !localEmail.includes("@")}
+            className="w-full bg-rich-coral hover:bg-rich-coral/90 text-white font-sans disabled:opacity-50 disabled:cursor-not-allowed"
             size="lg"
           >
             {isProcessing ? (
@@ -172,10 +219,12 @@ function CheckoutForm({ amount, photoCount, services, email, onSuccess, onError 
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Processing Payment...
               </>
+            ) : !localEmail || !localEmail.includes("@") ? (
+              "Enter Email to Continue"
             ) : (
               <>
                 <CreditCard className="h-4 w-4 mr-2" />
-                Pay ${amount.toFixed(2)} Securely
+                Pay ${amount.toFixed(2)} & Send Photos
               </>
             )}
           </Button>
@@ -183,7 +232,7 @@ function CheckoutForm({ amount, photoCount, services, email, onSuccess, onError 
 
         <div className="text-center">
           <p className="text-xs text-deep-navy/60 font-sans">
-            🔒 Secured by Stripe • Your payment information is encrypted and secure
+            🔒 Secured by Stripe • Photos automatically emailed after successful payment
           </p>
         </div>
       </CardContent>
