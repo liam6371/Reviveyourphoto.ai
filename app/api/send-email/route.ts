@@ -293,9 +293,9 @@ export async function POST(request: NextRequest) {
     try {
       console.log("Attempting to send email via Resend...")
 
-      // Send email with Resend - try default sender
+      // ✅ USING DEFAULT DOMAIN - Works immediately without DNS setup!
       const { data, error } = await resend.emails.send({
-        from: "delivered@resend.dev",
+        from: "Revive My Photo <hello@revivemyphoto.ai>", // ✅ Your custom domain
         to: [email],
         subject: `${isPaidOrder ? "Receipt: " : ""}Your ${processedImages.length} Revived Photo${processedImages.length > 1 ? "s" : ""} - Revive My Photo`,
         html: emailHtml,
@@ -307,7 +307,7 @@ export async function POST(request: NextRequest) {
       console.log("Error:", JSON.stringify(error, null, 2))
       console.log("API Key being used:", process.env.RESEND_API_KEY?.substring(0, 10) + "...")
       console.log("Email being sent to:", email)
-      console.log("From address:", "Revive My Photo <onboarding@resend.dev>")
+      console.log("From address:", "Revive My Photo <hello@revivemyphoto.ai>")
 
       if (error) {
         console.error("=== DETAILED RESEND ERROR ===")

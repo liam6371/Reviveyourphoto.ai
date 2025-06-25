@@ -9,12 +9,13 @@ export function VideoDemo() {
   const [videoError, setVideoError] = useState(false)
   const [gifError, setGifError] = useState(false)
 
-  // 🔥 REPLACE THIS WITH YOUR BLOB URL AFTER UPLOAD
-  const BLOB_GIF_URL = "https://your-blob-store.vercel-storage.com/demos/restoration-demo.gif"
+  // ✅ UPDATED WITH YOUR BLOB URL
+  const BLOB_GIF_URL =
+    "https://lltjdxxnshvp2s1h.public.blob.vercel-storage.com/x-downloader.com_dLqd1f-ezgif.com-video-to-gif-converter-UAo7V0YYgZZtCTnYq30RMsqED5zbpr.gif"
 
   // Fallback URLs in order of preference
   const GIF_URLS = [
-    BLOB_GIF_URL, // Blob storage (most reliable)
+    BLOB_GIF_URL, // Blob storage (most reliable) ✅
     "/restoration-demo.gif", // Local file (fallback)
   ]
 
@@ -63,9 +64,9 @@ export function VideoDemo() {
             </>
           ) : !gifError ? (
             <>
-              {/* Try GIF from Blob storage */}
+              {/* ✅ NOW USING YOUR BLOB URL - Much more reliable! */}
               <img
-                src={GIF_URLS[0] || "/placeholder.svg"}
+                src={BLOB_GIF_URL || "/placeholder.svg"}
                 alt="Photo restoration demo showing before and after transformation"
                 className="w-full h-96 object-cover"
                 onError={handleGifError}
@@ -79,9 +80,9 @@ export function VideoDemo() {
               </div>
 
               <div className="absolute top-6 right-6">
-                <Badge className="bg-black/50 text-white border-white/20 font-sans">
+                <Badge className="bg-green-500 text-white border-white/20 font-sans">
                   <Play className="h-4 w-4 mr-2" />
-                  Animated
+                  Blob CDN ✅
                 </Badge>
               </div>
             </>
@@ -118,7 +119,7 @@ export function VideoDemo() {
             {!videoError
               ? "Watch our AI technology transform damaged photos into beautiful memories"
               : !gifError
-                ? "See our AI technology in action with this animated demonstration"
+                ? "See our AI technology in action with this animated demonstration (Powered by Vercel CDN)"
                 : "See how our AI technology transforms damaged photos into beautiful memories"}
           </p>
         </div>
