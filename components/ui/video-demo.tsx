@@ -7,10 +7,25 @@ import Image from "next/image"
 
 export function VideoDemo() {
   const [videoError, setVideoError] = useState(false)
+  const [gifError, setGifError] = useState(false)
+
+  // 🔥 REPLACE THIS WITH YOUR BLOB URL AFTER UPLOAD
+  const BLOB_GIF_URL = "https://your-blob-store.vercel-storage.com/demos/restoration-demo.gif"
+
+  // Fallback URLs in order of preference
+  const GIF_URLS = [
+    BLOB_GIF_URL, // Blob storage (most reliable)
+    "/restoration-demo.gif", // Local file (fallback)
+  ]
 
   const handleVideoError = () => {
-    console.log("Video failed to load, showing fallback")
+    console.log("Video failed to load, trying GIF...")
     setVideoError(true)
+  }
+
+  const handleGifError = () => {
+    console.log("GIF failed to load, showing static image")
+    setGifError(true)
   }
 
   return (
@@ -19,7 +34,7 @@ export function VideoDemo() {
         <div className="relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-deep-navy/5 to-rich-coral/5">
           {!videoError ? (
             <>
-              {/* Try video first, fallback to static image */}
+              {/* Try video first */}
               <video
                 autoPlay
                 loop
@@ -30,11 +45,8 @@ export function VideoDemo() {
                 onError={handleVideoError}
               >
                 <source src="/restoration-demo.mp4" type="video/mp4" />
-                {/* Remove GIF source to avoid deployment issues */}
-                Your browser does not support the video tag.
               </video>
 
-              {/* Video overlay with branding */}
               <div className="absolute bottom-6 left-6">
                 <Badge className="bg-white/90 text-deep-navy border-deep-navy/20 font-sans">
                   <Sparkles className="h-4 w-4 mr-2" />
@@ -42,7 +54,6 @@ export function VideoDemo() {
                 </Badge>
               </div>
 
-              {/* Play indicator */}
               <div className="absolute top-6 right-6">
                 <Badge className="bg-black/50 text-white border-white/20 font-sans">
                   <Play className="h-4 w-4 mr-2" />
@@ -50,8 +61,32 @@ export function VideoDemo() {
                 </Badge>
               </div>
             </>
+          ) : !gifError ? (
+            <>
+              {/* Try GIF from Blob storage */}
+              <img
+                src={GIF_URLS[0] || "/placeholder.svg"}
+                alt="Photo restoration demo showing before and after transformation"
+                className="w-full h-96 object-cover"
+                onError={handleGifError}
+              />
+
+              <div className="absolute bottom-6 left-6">
+                <Badge className="bg-white/90 text-deep-navy border-deep-navy/20 font-sans">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  AI Demo
+                </Badge>
+              </div>
+
+              <div className="absolute top-6 right-6">
+                <Badge className="bg-black/50 text-white border-white/20 font-sans">
+                  <Play className="h-4 w-4 mr-2" />
+                  Animated
+                </Badge>
+              </div>
+            </>
           ) : (
-            /* Fallback: Show static image instead of GIF */
+            /* Final fallback: Static image */
             <div className="w-full h-96 relative overflow-hidden">
               <Image
                 src="/examples/repair-damage-eyes.jpg"
@@ -61,7 +96,6 @@ export function VideoDemo() {
                 priority
               />
 
-              {/* Static image overlay */}
               <div className="absolute bottom-6 left-6">
                 <Badge className="bg-white/90 text-deep-navy border-deep-navy/20 font-sans">
                   <Sparkles className="h-4 w-4 mr-2" />
@@ -69,7 +103,6 @@ export function VideoDemo() {
                 </Badge>
               </div>
 
-              {/* Static indicator */}
               <div className="absolute top-6 right-6">
                 <Badge className="bg-black/50 text-white border-white/20 font-sans">
                   <ArrowRight className="h-4 w-4 mr-2" />
@@ -80,12 +113,13 @@ export function VideoDemo() {
           )}
         </div>
 
-        {/* Demo Description */}
         <div className="mt-6 text-center">
           <p className="text-deep-navy/60 font-sans text-sm">
-            {videoError
-              ? "See how our AI technology transforms damaged photos into beautiful memories"
-              : "Watch our AI technology transform damaged photos into beautiful memories"}
+            {!videoError
+              ? "Watch our AI technology transform damaged photos into beautiful memories"
+              : !gifError
+                ? "See our AI technology in action with this animated demonstration"
+                : "See how our AI technology transforms damaged photos into beautiful memories"}
           </p>
         </div>
       </div>
