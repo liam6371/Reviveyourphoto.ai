@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
+import { StripeCheckout } from "@/components/ui/stripe-checkout"
 
 export default function UploadPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -380,19 +381,52 @@ Don't worry - your photos are ready! You can:
       return
     }
 
-    // For now, simulate payment processing
-    alert(`Payment processing would start here for ${email} - Total: $${pricing.total.toFixed(2)}`)
-
-    // In a real implementation, you would:
-    // 1. Create payment intent
-    // 2. Show Stripe payment form
-    // 3. Process payment
-    // 4. Send photos via email
+    // Redirect to real Stripe payment
+    setStep(5) // Add a new payment step
   }
 
-  const handlePaymentSuccess = (paymentIntentId: string) => {
+  const handlePaymentSuccess = async (paymentIntentId: string) => {
     setPaymentSuccess(true)
-    alert(`Payment successful! Your photos are being processed. Payment ID: ${paymentIntentId}`)
+    addDebugInfo(`Payment successful: ${paymentIntentId}`)
+
+    // After successful payment, automatically send the photos via email
+    try {
+      setIsEmailSending(true)
+
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email,
+          restoredImages: restorationResults.map((r) => r.restoredImage),
+          originalImages: restorationResults.map((r) => r.originalImage),
+          services: selectedServices,
+          filenames: restorationResults.map((r) => r.filename),
+          paymentIntentId: paymentIntentId,
+          paid: true,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setEmailSent(true)
+        alert(`Payment successful! Your restored photos have been sent to ${email}. Payment ID: ${paymentIntentId}`)
+      } else {
+        alert(
+          `Payment successful (ID: ${paymentIntentId}), but email delivery failed. Please contact support with your payment ID.`,
+        )
+      }
+    } catch (error) {
+      console.error("Post-payment email error:", error)
+      alert(
+        `Payment successful (ID: ${paymentIntentId}), but email delivery failed. Please contact support with your payment ID.`,
+      )
+    } finally {
+      setIsEmailSending(false)
+    }
   }
 
   const handlePaymentError = (error: string) => {
@@ -466,6 +500,12 @@ Don't worry - your photos are ready! You can:
               className={step >= 4 ? "bg-rich-coral text-white" : "bg-deep-navy/20 text-deep-navy"}
             >
               4. Delivery
+            </Badge>
+            <Badge
+              variant={step >= 5 ? "default" : "secondary"}
+              className={step >= 5 ? "bg-rich-coral text-white" : "bg-deep-navy/20 text-deep-navy"}
+            >
+              5. Payment
             </Badge>
           </div>
         </div>
@@ -1007,6 +1047,35 @@ Don't worry - your photos are ready! You can:
                 onClick={() => setStep(3)}
               >
                 Back to Preview
+              </Button>
+            </div>
+          </div>
+        )}
+        {step === 5 && (
+          <div className="space-y-12">
+            <div className="text-center">
+              <h1 className="text-5xl font-serif font-bold text-deep-navy mb-6">Secure Payment</h1>
+              <p className="text-xl text-deep-navy/70 font-sans">
+                Complete your payment to receive your restored photos
+              </p>
+            </div>
+
+            <StripeCheckout
+              amount={pricing.total}
+              photoCount={pricing.photoCount}
+              services={selectedServices}
+              email={email}
+              onSuccess={handlePaymentSuccess}
+              onError={handlePaymentError}
+            />
+
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                className="border-deep-navy/30 text-deep-navy hover:bg-deep-navy/5 font-sans"
+                onClick={() => setStep(4)}
+              >
+                Back to Delivery Options
               </Button>
             </div>
           </div>

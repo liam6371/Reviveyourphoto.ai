@@ -132,7 +132,7 @@ function CheckoutForm({ amount, photoCount, services, email, onSuccess, onError 
         </CardTitle>
         <div className="flex justify-between items-center">
           <span className="font-sans text-deep-navy/70">
-            {photoCount} photo{photoCount > 1 ? "s" : ""} × $0.04 each
+            {photoCount} photo{photoCount > 1 ? "s" : ""} × $0.50 each
           </span>
           <Badge className="bg-green-100 text-green-700">Launch Special</Badge>
         </div>
