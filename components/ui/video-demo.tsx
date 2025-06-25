@@ -19,7 +19,7 @@ export function VideoDemo() {
         <div className="relative rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-deep-navy/5 to-rich-coral/5">
           {!videoError ? (
             <>
-              {/* Video Option - Updated to use your MP4 */}
+              {/* Try video first, fallback to static image */}
               <video
                 autoPlay
                 loop
@@ -30,6 +30,7 @@ export function VideoDemo() {
                 onError={handleVideoError}
               >
                 <source src="/restoration-demo.mp4" type="video/mp4" />
+                {/* Remove GIF source to avoid deployment issues */}
                 Your browser does not support the video tag.
               </video>
 
@@ -50,18 +51,17 @@ export function VideoDemo() {
               </div>
             </>
           ) : (
-            /* Fallback: Show as GIF instead */
+            /* Fallback: Show static image instead of GIF */
             <div className="w-full h-96 relative overflow-hidden">
               <Image
-                src="/restoration-demo.gif"
+                src="/examples/repair-damage-eyes.jpg"
                 alt="Photo restoration demo showing before and after transformation"
                 fill
                 className="object-cover"
                 priority
-                unoptimized // Important for GIFs to animate properly
               />
 
-              {/* GIF overlay */}
+              {/* Static image overlay */}
               <div className="absolute bottom-6 left-6">
                 <Badge className="bg-white/90 text-deep-navy border-deep-navy/20 font-sans">
                   <Sparkles className="h-4 w-4 mr-2" />
@@ -69,11 +69,11 @@ export function VideoDemo() {
                 </Badge>
               </div>
 
-              {/* GIF indicator */}
+              {/* Static indicator */}
               <div className="absolute top-6 right-6">
                 <Badge className="bg-black/50 text-white border-white/20 font-sans">
                   <ArrowRight className="h-4 w-4 mr-2" />
-                  Animated Demo
+                  Before & After
                 </Badge>
               </div>
             </div>

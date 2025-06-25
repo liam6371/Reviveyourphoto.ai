@@ -293,15 +293,36 @@ export async function POST(request: NextRequest) {
     try {
       console.log("Attempting to send email via Resend...")
 
-      // Send email with Resend - using the exact format from your working example
+      // Send email with Resend - try default sender
       const { data, error } = await resend.emails.send({
-        from: "Revive My Photo <onboarding@resend.dev>",
+        from: "delivered@resend.dev",
         to: [email],
         subject: `${isPaidOrder ? "Receipt: " : ""}Your ${processedImages.length} Revived Photo${processedImages.length > 1 ? "s" : ""} - Revive My Photo`,
         html: emailHtml,
       })
 
+      // Add detailed error logging
+      console.log("=== RESEND API RESPONSE ===")
+      console.log("Data:", JSON.stringify(data, null, 2))
+      console.log("Error:", JSON.stringify(error, null, 2))
+      console.log("API Key being used:", process.env.RESEND_API_KEY?.substring(0, 10) + "...")
+      console.log("Email being sent to:", email)
+      console.log("From address:", "Revive My Photo <onboarding@resend.dev>")
+
       if (error) {
+        console.error("=== DETAILED RESEND ERROR ===")
+        console.error("Error type:", typeof error)
+        console.error("Error keys:", Object.keys(error))
+        console.error("Full error object:", error)
+
+        // Check for specific error types
+        if (error.message) {
+          console.error("Error message:", error.message)
+        }
+        if (error.name) {
+          console.error("Error name:", error.name)
+        }
+
         console.error("Resend error:", error)
 
         // For paid orders, provide fallback with download links instead of failing
