@@ -555,11 +555,12 @@ export default function HomePage() {
               </ul>
             </div>
             <div>
-              <h3 className="font-serif font-semibold mb-6">Contact</h3>
+              <h3 className="font-serif font-semibold mb-6">Company</h3>
               <ul className="space-y-3 text-warm-beige/70 font-sans">
-                <li>support@revivemyphoto.ai</li>
-                <li>1-800-REVIVE</li>
-                <li>24/7 Customer Support</li>
+                <li>About Us</li>
+                <li>Our Technology</li>
+                <li>Quality Guarantee</li>
+                <li>Customer Stories</li>
               </ul>
             </div>
           </div>

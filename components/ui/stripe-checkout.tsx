@@ -251,6 +251,7 @@ interface StripeCheckoutProps {
 
 export function StripeCheckout({ amount, photoCount, services, email, onSuccess, onError }: StripeCheckoutProps) {
   const [isStripeConfigured, setIsStripeConfigured] = useState(true)
+  const PAYMENTS_TEMPORARILY_DISABLED = true
 
   useEffect(() => {
     // Check if Stripe is configured on the client side
@@ -258,6 +259,42 @@ export function StripeCheckout({ amount, photoCount, services, email, onSuccess,
       setIsStripeConfigured(false)
     }
   }, [])
+
+  if (PAYMENTS_TEMPORARILY_DISABLED) {
+    return (
+      <Card className="bg-gray-100 border-gray-300 opacity-75">
+        <CardContent className="p-8 text-center">
+          <div className="space-y-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+              <AlertCircle className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
+              <h3 className="text-xl font-serif font-bold text-gray-700 mb-2">Payment Temporarily Unavailable</h3>
+              <p className="text-gray-600 font-sans mb-4">
+                We're currently fixing our email delivery system to ensure all customers receive their restored photos
+                immediately after payment.
+              </p>
+              <p className="text-gray-600 font-sans text-sm">
+                Payments will be re-enabled shortly. Thank you for your patience!
+              </p>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-serif font-semibold text-blue-900 mb-2">What's Being Fixed:</h4>
+              <ul className="text-blue-800 font-sans text-sm text-left space-y-1">
+                <li>• Email delivery system optimization</li>
+                <li>• Automatic photo delivery after payment</li>
+                <li>• Backup delivery methods</li>
+                <li>• Enhanced customer support</li>
+              </ul>
+            </div>
+
+            <div className="text-center">
+              <p className="text-gray-500 font-sans text-sm">Expected resolution: Within 1 hour</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   // Show configuration error if Stripe is not set up
   if (!isStripeConfigured || !stripePromise) {

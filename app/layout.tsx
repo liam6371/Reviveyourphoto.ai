@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   title: "Revive My Photo - AI-Powered Photo Restoration",
   description:
     "Professional photo restoration using advanced AI technology. Repair damage, add color, and enhance quality to bring your old photos back to life with Revive My Photo.",
-    generator: 'v0.dev'
+    generator: 'v0.app'
 }
 
 export default function RootLayout({

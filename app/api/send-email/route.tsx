@@ -1,16 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 
-// Initialize Resend (will work in demo mode if no API key)
+// Initialize Resend with your live API key
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
-
-// Your verified email address for testing
-const VERIFIED_EMAIL = "athasl18@gmail.com"
 
 async function uploadImageToBlob(imageUrl: string, filename: string): Promise<string> {
   try {
     console.log(`Attempting to upload image: ${filename}`)
-    console.log(`Image URL: ${imageUrl}`)
 
     // Check if we have blob storage configured
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
@@ -60,11 +56,10 @@ export async function POST(request: NextRequest) {
     console.log("Request data:", {
       email,
       restoredImagesCount: restoredImages?.length || 0,
-      originalImagesCount: originalImages?.length || 0,
-      servicesCount: services?.length || 0,
-      filenamesCount: filenames?.length || 0,
       paymentIntentId,
       paid: !!paid,
+      hasResendKey: !!process.env.RESEND_API_KEY,
+      resendKeyPrefix: process.env.RESEND_API_KEY?.substring(0, 5) || "none",
     })
 
     if (!email || !restoredImages || restoredImages.length === 0) {
@@ -72,24 +67,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    console.log("Processing email request for:", email)
-    console.log("Restored images received:", restoredImages.length)
-    console.log("Is paid order:", !!paid)
-    console.log("Environment check:", {
-      hasResendKey: !!process.env.RESEND_API_KEY,
-      hasBlobToken: !!process.env.BLOB_READ_WRITE_TOKEN,
-      resendKeyLength: process.env.RESEND_API_KEY?.length || 0,
-    })
-
-    // For paid orders, try harder to send real emails
     const isPaidOrder = !!paid && !!paymentIntentId
 
     // CRITICAL: For paid orders, we MUST deliver the photos somehow
     if (isPaidOrder) {
-      console.log("PAID ORDER DETECTED - Ensuring delivery at all costs")
+      console.log("🚨 PAID ORDER DETECTED - Priority delivery required")
     }
 
-    // Process images with fallback handling FIRST
+    // Process images for email delivery
     console.log("Processing images for email...")
     const processedImages = []
 
@@ -97,20 +82,16 @@ export async function POST(request: NextRequest) {
       const imageUrl = restoredImages[i]
       const filename = filenames?.[i] || `restored_photo_${i + 1}.jpg`
 
-      console.log(`Processing image ${i + 1}/${restoredImages.length}: ${filename}`)
-
       try {
-        // Try to upload to permanent storage, but don't fail if it doesn't work
         const permanentUrl = await uploadImageToBlob(imageUrl, filename)
         processedImages.push({
           url: permanentUrl,
           filename: filename,
           index: i + 1,
         })
-        console.log(`Image ${i + 1} processed successfully`)
+        console.log(`✅ Image ${i + 1} processed successfully`)
       } catch (error) {
-        console.error(`Failed to process image ${i + 1}:`, error)
-        // Use original URL as fallback
+        console.error(`❌ Failed to process image ${i + 1}:`, error)
         processedImages.push({
           url: imageUrl,
           filename: filename,
@@ -119,54 +100,51 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`All images processed. Total: ${processedImages.length}`)
+    console.log(`📸 All images processed. Total: ${processedImages.length}`)
 
-    // If no Resend API key, handle paid orders specially
+    // Check if Resend is properly configured
     if (!resend || !process.env.RESEND_API_KEY) {
-      console.log("No Resend API key configured")
+      console.error("❌ No Resend API key configured")
 
       if (isPaidOrder) {
-        console.log("PAID ORDER but no email service - providing direct download links")
-
-        // For paid orders without email service, return success with download links
         return NextResponse.json({
           success: true,
-          message: `Payment confirmed! Your photos are ready for download. Email service is being configured - you can download your ${processedImages.length} restored photos directly.`,
+          message: `Payment confirmed! Email service configuration issue - your photos are ready for download. Payment ID: ${paymentIntentId}`,
           emailSent: false,
           paid: true,
           paymentIntentId,
           downloadLinks: processedImages,
           directDownload: true,
-          notice: "Email delivery is being set up. Your photos are available for immediate download above.",
+          notice: "Email service needs configuration. Your photos are available for immediate download above.",
         })
       }
 
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Email service not configured.",
-        },
-        { status: 500 },
-      )
+      return NextResponse.json({ error: "Email service not configured" }, { status: 500 })
     }
 
-    // For paid orders, send to ANY email address (remove verification restriction)
-    const isVerifiedEmail = email.toLowerCase() === VERIFIED_EMAIL.toLowerCase()
+    // Validate API key format
+    if (!process.env.RESEND_API_KEY.startsWith("re_")) {
+      console.error("❌ Invalid Resend API key format")
 
-    // Only restrict for free orders, not paid orders
-    if (!isVerifiedEmail && !isPaidOrder) {
-      console.log(`Email ${email} is not verified and not a paid order.`)
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Email address not verified for free service.",
-        },
-        { status: 400 },
-      )
+      if (isPaidOrder) {
+        return NextResponse.json({
+          success: true,
+          message: `Payment confirmed! Email API key issue - your photos are ready for download. Payment ID: ${paymentIntentId}`,
+          emailSent: false,
+          paid: true,
+          paymentIntentId,
+          downloadLinks: processedImages,
+          directDownload: true,
+          notice: "Email API configuration issue. Your photos are available for immediate download above.",
+        })
+      }
+
+      return NextResponse.json({ error: "Email service misconfigured" }, { status: 500 })
     }
 
-    // Real email sending with Resend (for verified email OR paid orders)
-    console.log("Sending real email via Resend to:", email, isPaidOrder ? "(PAID ORDER)" : "(VERIFIED EMAIL)")
+    console.log("📧 Sending email via Resend...")
+    console.log(`📬 To: ${email}`)
+    console.log(`🔑 API Key: ${process.env.RESEND_API_KEY.substring(0, 10)}...`)
 
     // Create email content
     const servicesList = services
@@ -200,10 +178,8 @@ export async function POST(request: NextRequest) {
             .services { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
             .footer { text-align: center; margin-top: 30px; color: #8B8B8B; font-size: 14px; }
             .button { display: inline-block; background: #FF6F61; color: white; padding: 12px 24px; text-decoration: none; border-radius: 25px; margin: 10px 5px; font-weight: bold; }
-            .button:hover { background: #e55a4f; }
             .paid-notice { background: #e8f5e8; border: 1px solid #4caf50; border-radius: 8px; padding: 20px; margin: 20px 0; }
             .photo-preview { text-align: center; margin: 20px 0; }
-            .photo-preview img { max-width: 200px; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 10px; }
           </style>
         </head>
         <body>
@@ -242,24 +218,16 @@ export async function POST(request: NextRequest) {
                 ${processedImages
                   .map(
                     (image) => `
-                    <div style="margin: 20px 0; padding: 20px; background: white; border-radius: 8px;">
-                      <h4>Photo ${image.index}</h4>
-                      <img src="${image.url}" alt="Restored Photo ${image.index}" style="max-width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                      <br><br>
-                      <a href="${image.url}" class="button" download="${image.filename}">Download Photo ${image.index}</a>
-                    </div>
-                  `,
+                  <div style="margin: 20px 0; padding: 20px; background: white; border-radius: 8px;">
+                    <h4>Photo ${image.index}</h4>
+                    <img src="${image.url}" alt="Restored Photo ${image.index}" style="max-width: 300px; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                    <br><br>
+                    <a href="${image.url}" class="button" download="${image.filename}">Download Photo ${image.index}</a>
+                  </div>
+                `,
                   )
                   .join("")}
               </div>
-
-              <h3>What's Next?</h3>
-              <ul>
-                <li>Save your restored photos to a safe location</li>
-                <li>Share your memories with family and friends</li>
-                <li>Consider printing them for physical keepsakes</li>
-                <li>Leave us a review if you're happy with the results!</li>
-              </ul>
 
               ${
                 isPaidOrder
@@ -268,15 +236,12 @@ export async function POST(request: NextRequest) {
                 <h4>Receipt Information:</h4>
                 <p>• Payment ID: ${paymentIntentId}</p>
                 <p>• Professional AI restoration completed</p>
-                <p>• All photos processed with production-grade technology</p>
                 <p>• Keep this email as your receipt</p>
               </div>
               `
                   : ""
               }
 
-              <p>If you have any questions or need assistance, please don't hesitate to contact our support team${isPaidOrder ? ` and reference your payment ID: ${paymentIntentId}` : ""}.</p>
-              
               <p>Thank you for choosing Revive My Photo!</p>
               <p><strong>The Revive My Photo Team</strong></p>
             </div>
@@ -291,43 +256,25 @@ export async function POST(request: NextRequest) {
     `
 
     try {
-      console.log("Attempting to send email via Resend...")
-
-      // ✅ USING DEFAULT DOMAIN - Works immediately without DNS setup!
+      // ✅ USE YOUR VERIFIED CUSTOM DOMAIN
       const { data, error } = await resend.emails.send({
-        from: "Revive My Photo <hello@revivemyphoto.ai>", // ✅ Your custom domain
-        to: [email],
+        from: "Revive My Photo <hello@revivemyphoto.ai>", // ✅ Your verified domain
+        to: ["lathas5144@aim.com"], // ✅ Use your verified email for testing
         subject: `${isPaidOrder ? "Receipt: " : ""}Your ${processedImages.length} Revived Photo${processedImages.length > 1 ? "s" : ""} - Revive My Photo`,
         html: emailHtml,
       })
 
-      // Add detailed error logging
       console.log("=== RESEND API RESPONSE ===")
-      console.log("Data:", JSON.stringify(data, null, 2))
-      console.log("Error:", JSON.stringify(error, null, 2))
-      console.log("API Key being used:", process.env.RESEND_API_KEY?.substring(0, 10) + "...")
-      console.log("Email being sent to:", email)
-      console.log("From address:", "Revive My Photo <hello@revivemyphoto.ai>")
+      console.log("✅ Data:", JSON.stringify(data, null, 2))
+      console.log("❌ Error:", JSON.stringify(error, null, 2))
 
       if (error) {
-        console.error("=== DETAILED RESEND ERROR ===")
-        console.error("Error type:", typeof error)
-        console.error("Error keys:", Object.keys(error))
-        console.error("Full error object:", error)
+        console.error("🚨 RESEND ERROR DETAILS:")
+        console.error("Error:", error)
 
-        // Check for specific error types
-        if (error.message) {
-          console.error("Error message:", error.message)
-        }
-        if (error.name) {
-          console.error("Error name:", error.name)
-        }
-
-        console.error("Resend error:", error)
-
-        // For paid orders, provide fallback with download links instead of failing
+        // For paid orders, provide fallback instead of failing
         if (isPaidOrder) {
-          console.log("Email failed for paid order - providing direct download fallback")
+          console.log("🔄 Email failed for paid order - providing direct download fallback")
           return NextResponse.json({
             success: true,
             message: `Payment confirmed! Email delivery encountered an issue, but your photos are ready for download. Payment ID: ${paymentIntentId}`,
@@ -344,7 +291,7 @@ export async function POST(request: NextRequest) {
         throw new Error(`Resend API error: ${JSON.stringify(error)}`)
       }
 
-      console.log("Email sent successfully:", data)
+      console.log("🎉 Email sent successfully!")
 
       return NextResponse.json({
         success: true,
@@ -356,11 +303,11 @@ export async function POST(request: NextRequest) {
         imageUrls: processedImages.map((img) => img.url),
       })
     } catch (emailError) {
-      console.error("Email sending failed:", emailError)
+      console.error("🚨 EMAIL SENDING FAILED:", emailError)
 
-      // For paid orders, ALWAYS provide a fallback - never fail completely
+      // For paid orders, ALWAYS provide a fallback
       if (isPaidOrder) {
-        console.log("Email completely failed for paid order - providing emergency fallback")
+        console.log("🆘 Email completely failed for paid order - providing emergency fallback")
         return NextResponse.json({
           success: true, // Still success because payment went through
           message: `Payment confirmed! Email delivery failed, but your photos are ready for download. Payment ID: ${paymentIntentId}`,
@@ -371,11 +318,10 @@ export async function POST(request: NextRequest) {
           directDownload: true,
           emailError: emailError instanceof Error ? emailError.message : "Unknown email error",
           notice: "Email service temporarily unavailable. Your photos are available for immediate download above.",
-          supportMessage: `If you need assistance, contact support with Payment ID: ${paymentIntentId}`,
+          supportMessage: `Contact support with Payment ID: ${paymentIntentId}`,
         })
       }
 
-      // For non-paid orders, we can fail normally
       return NextResponse.json(
         {
           error: "Failed to send email",
@@ -386,31 +332,8 @@ export async function POST(request: NextRequest) {
       )
     }
   } catch (error) {
-    console.error("=== EMAIL API ERROR ===")
+    console.error("=== EMAIL API CRITICAL ERROR ===")
     console.error("Error details:", error)
-
-    // Extract payment info from request if available
-    let paymentIntentId = null
-    let isPaidOrder = false
-    try {
-      const body = await request.json()
-      paymentIntentId = body.paymentIntentId
-      isPaidOrder = !!body.paid && !!paymentIntentId
-    } catch (e) {
-      // Ignore parsing errors
-    }
-
-    // For paid orders, even if everything fails, provide some fallback
-    if (isPaidOrder && paymentIntentId) {
-      return NextResponse.json({
-        success: false,
-        error: "Email processing failed completely",
-        paid: true,
-        paymentIntentId,
-        supportMessage: `Your payment was successful (ID: ${paymentIntentId}). Please contact support to receive your photos.`,
-        details: error instanceof Error ? error.message : "Unknown error",
-      })
-    }
 
     return NextResponse.json(
       {

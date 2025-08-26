@@ -32,7 +32,7 @@ export async function GET() {
     // Test with the most basic email possible
     const result = await resend.emails.send({
       from: "delivered@resend.dev",
-      to: ["athasl18@gmail.com"],
+      to: ["lathas5144@aim.com"], // ✅ Your verified email
       subject: "Debug Test",
       html: "<p>Testing if API key works</p>",
     })

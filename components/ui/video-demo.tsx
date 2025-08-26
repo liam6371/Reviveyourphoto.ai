@@ -45,7 +45,7 @@ export function VideoDemo() {
                 poster="/examples/repair-damage-eyes.jpg"
                 onError={handleVideoError}
               >
-                <source src="/restoration-demo.mp4" type="video/mp4" />
+                <source src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/x-downloader.com_dLqd1f-sJKdXpn5oDg7db9gt2MHYSgmAIDdu8.mp4" type="video/mp4" />
               </video>
 
               <div className="absolute bottom-6 left-6">
